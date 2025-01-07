@@ -14,15 +14,8 @@ import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import edu.wpi.first.wpilibj2.command.sysid.SysIdRoutine;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
-import org.littletonrobotics.frc2025.generated.TunerConstants;
-import org.littletonrobotics.frc2025.subsystems.drive.Drive;
-import org.littletonrobotics.frc2025.subsystems.drive.GyroIO;
-import org.littletonrobotics.frc2025.subsystems.drive.GyroIOPigeon2;
-import org.littletonrobotics.frc2025.subsystems.drive.ModuleIO;
-import org.littletonrobotics.frc2025.subsystems.drive.ModuleIOSim;
-import org.littletonrobotics.frc2025.subsystems.drive.ModuleIOTalonFX;
+import org.littletonrobotics.frc2025.subsystems.drive.*;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class RobotContainer {
@@ -43,28 +36,28 @@ public class RobotContainer {
           drive =
               new Drive(
                   new GyroIOPigeon2(),
-                  new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                  new ModuleIOTalonFX(TunerConstants.FrontRight),
-                  new ModuleIOTalonFX(TunerConstants.BackLeft),
-                  new ModuleIOTalonFX(TunerConstants.BackRight));
+                  new ModuleIOComp(DriveConstants.moduleConfigsComp[0]),
+                  new ModuleIOComp(DriveConstants.moduleConfigsComp[1]),
+                  new ModuleIOComp(DriveConstants.moduleConfigsComp[2]),
+                  new ModuleIOComp(DriveConstants.moduleConfigsComp[3]));
         }
         case DEVBOT -> {
           drive =
               new Drive(
                   new GyroIOPigeon2(),
-                  new ModuleIOTalonFX(TunerConstants.FrontLeft),
-                  new ModuleIOTalonFX(TunerConstants.FrontRight),
-                  new ModuleIOTalonFX(TunerConstants.BackLeft),
-                  new ModuleIOTalonFX(TunerConstants.BackRight));
+                  new ModuleIODev(DriveConstants.moduleConfigsDev[0]),
+                  new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
+                  new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
+                  new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
         }
         case SIMBOT -> {
           drive =
               new Drive(
                   new GyroIO() {},
-                  new ModuleIOSim(TunerConstants.FrontLeft),
-                  new ModuleIOSim(TunerConstants.FrontRight),
-                  new ModuleIOSim(TunerConstants.BackLeft),
-                  new ModuleIOSim(TunerConstants.BackRight));
+                  new ModuleIOSim(),
+                  new ModuleIOSim(),
+                  new ModuleIOSim(),
+                  new ModuleIOSim());
         }
       }
     }
@@ -83,21 +76,11 @@ public class RobotContainer {
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices");
 
-    // Set up SysId routines
+    // Set up Characterization routines
     autoChooser.addOption(
         "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));
     autoChooser.addOption(
         "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
-    autoChooser.addOption(
-        "Drive SysId (Quasistatic Forward)",
-        drive.sysIdQuasistatic(SysIdRoutine.Direction.kForward));
-    autoChooser.addOption(
-        "Drive SysId (Quasistatic Reverse)",
-        drive.sysIdQuasistatic(SysIdRoutine.Direction.kReverse));
-    autoChooser.addOption(
-        "Drive SysId (Dynamic Forward)", drive.sysIdDynamic(SysIdRoutine.Direction.kForward));
-    autoChooser.addOption(
-        "Drive SysId (Dynamic Reverse)", drive.sysIdDynamic(SysIdRoutine.Direction.kReverse));
 
     // Configure the button bindings
     configureButtonBindings();

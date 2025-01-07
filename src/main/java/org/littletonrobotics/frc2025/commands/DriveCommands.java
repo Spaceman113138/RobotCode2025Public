@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
+import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 
 public class DriveCommands {
   private static final double DEADBAND = 0.1;
@@ -264,7 +265,8 @@ public class DriveCommands {
                       for (int i = 0; i < 4; i++) {
                         wheelDelta += Math.abs(positions[i] - state.positions[i]) / 4.0;
                       }
-                      double wheelRadius = (state.gyroDelta * Drive.DRIVE_BASE_RADIUS) / wheelDelta;
+                      double wheelRadius =
+                          (state.gyroDelta * DriveConstants.driveBaseRadius) / wheelDelta;
 
                       NumberFormat formatter = new DecimalFormat("#0.000");
                       System.out.println(
