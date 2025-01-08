@@ -116,7 +116,7 @@ public class Module {
 
   /** Runs the module with the specified setpoint state. Mutates the state to optimize it. */
   public void runSetpoint(SwerveModuleState state) {
-    // Optimize velocity setpoint
+    // Optimize Velocity setpoint
     state.optimize(getAngle());
     state.cosineScale(inputs.turnPosition);
 
@@ -127,14 +127,10 @@ public class Module {
   }
 
   /**
-   * runs the module with the specified setpoint state and a setpoint wheel torque used for
-   * feedforward. Mutates the state to optimize it.
+   * Runs the module with the specified setpoint state and a setpoint wheel force used for
+   * torque-based feedforward. Does NOT mutate the state to optimize it.
    */
   public void runSetpoint(SwerveModuleState state, double wheelTorqueNm) {
-    // Optimize velocity setpoint
-    state.optimize(getAngle());
-    state.cosineScale(inputs.turnPosition);
-
     // Apply setpoints
     double speedRadPerSec = state.speedMetersPerSecond / DriveConstants.wheelRadius;
     io.runDriveVelocity(

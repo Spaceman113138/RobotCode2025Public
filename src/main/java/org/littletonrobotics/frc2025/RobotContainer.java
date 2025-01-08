@@ -15,10 +15,16 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
+import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
+import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
+import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class RobotContainer {
+  // Load RobotState class
+  private final RobotState robotState = RobotState.getInstance();
+
   // Subsystems
   private Drive drive;
 
@@ -44,7 +50,7 @@ public class RobotContainer {
         case DEVBOT -> {
           drive =
               new Drive(
-                  new GyroIOPigeon2(),
+                  new GyroIORedux(),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[0]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
@@ -81,6 +87,14 @@ public class RobotContainer {
         "Drive Wheel Radius Characterization", DriveCommands.wheelRadiusCharacterization(drive));
     autoChooser.addOption(
         "Drive Simple FF Characterization", DriveCommands.feedforwardCharacterization(drive));
+    HolonomicTrajectory testTrajectory = new HolonomicTrajectory("BLOB");
+    autoChooser.addOption(
+        "Drive Trajectory",
+        Commands.runOnce(
+                () ->
+                    RobotState.getInstance()
+                        .resetPose(AllianceFlipUtil.apply(testTrajectory.getStartPose())))
+            .andThen(new DriveTrajectory(drive, testTrajectory)));
 
     // Configure the button bindings
     configureButtonBindings();
@@ -109,7 +123,7 @@ public class RobotContainer {
                 drive,
                 () -> -controller.getLeftY(),
                 () -> -controller.getLeftX(),
-                () -> new Rotation2d()));
+                () -> Rotation2d.kZero));
 
     // Switch to X pattern when X button is pressed
     controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
@@ -120,8 +134,11 @@ public class RobotContainer {
         .onTrue(
             Commands.runOnce(
                     () ->
-                        drive.setPose(
-                            new Pose2d(drive.getPose().getTranslation(), new Rotation2d())),
+                        RobotState.getInstance()
+                            .resetPose(
+                                new Pose2d(
+                                    RobotState.getInstance().getEstimatedPose().getTranslation(),
+                                    new Rotation2d())),
                     drive)
                 .ignoringDisable(true));
   }

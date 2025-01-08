@@ -8,6 +8,7 @@
 package org.littletonrobotics.frc2025.subsystems.drive;
 
 import static org.littletonrobotics.frc2025.subsystems.drive.DriveConstants.PigeonConstants;
+import static org.littletonrobotics.frc2025.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
@@ -36,6 +37,7 @@ public class GyroIOPigeon2 implements GyroIO {
     pigeon.optimizeBusUtilization();
     yawTimestampQueue = PhoenixOdometryThread.getInstance().makeTimestampQueue();
     yawPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(pigeon.getYaw());
+    tryUntilOk(5, () -> pigeon.setYaw(0.0, 0.25));
   }
 
   @Override
