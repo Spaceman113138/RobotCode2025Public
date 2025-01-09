@@ -24,3 +24,8 @@ jobs:
         run: ./gradlew build
         env:
           GENERATE_EMPTY_DRIVE_TRAJECTORIES: true
+      - name: Check constants (PR)
+        if: github.event_name == 'pull_request'
+        run: ./gradlew checkConstantsPullRequest
+        env:
+          GENERATE_EMPTY_DRIVE_TRAJECTORIES: true

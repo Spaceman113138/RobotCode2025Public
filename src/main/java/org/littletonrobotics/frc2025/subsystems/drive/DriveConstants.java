@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
 import lombok.Builder;
+import org.littletonrobotics.frc2025.util.swerve.ModuleLimits;
 
 public class DriveConstants {
   public static final double odometryFrequency = 250;
@@ -28,6 +29,9 @@ public class DriveConstants {
   };
 
   public static final double wheelRadius = Units.inchesToMeters(2.000);
+
+  public static final ModuleLimits moduleLimitsFree =
+      new ModuleLimits(maxLinearSpeed, maxAngularSpeed, Units.degreesToRadians(1080.0));
 
   public static final ModuleConfig[] moduleConfigsComp = {
     // FL

@@ -26,6 +26,8 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.RobotState;
+import org.littletonrobotics.frc2025.util.swerve.SwerveSetpoint;
+import org.littletonrobotics.frc2025.util.swerve.SwerveSetpointGenerator;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
@@ -40,6 +42,20 @@ public class Drive extends SubsystemBase {
   private final SwerveDriveKinematics kinematics =
       new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
+  @AutoLogOutput(key = "Drive/VelocityMode")
+  private boolean velocityMode = false;
+
+  private SwerveSetpoint currentSetpoint =
+      new SwerveSetpoint(
+          new ChassisSpeeds(),
+          new SwerveModuleState[] {
+            new SwerveModuleState(),
+            new SwerveModuleState(),
+            new SwerveModuleState(),
+            new SwerveModuleState()
+          });
+  private final SwerveSetpointGenerator swerveSetpointGenerator;
+
   public Drive(
       GyroIO gyroIO,
       ModuleIO flModuleIO,
@@ -51,6 +67,9 @@ public class Drive extends SubsystemBase {
     modules[1] = new Module(frModuleIO, 1);
     modules[2] = new Module(blModuleIO, 2);
     modules[3] = new Module(brModuleIO, 3);
+
+    swerveSetpointGenerator =
+        new SwerveSetpointGenerator(kinematics, DriveConstants.moduleTranslations);
 
     // Start odometry thread
     PhoenixOdometryThread.getInstance().start();
@@ -81,7 +100,7 @@ public class Drive extends SubsystemBase {
     // Log empty setpoint states when disabled
     if (DriverStation.isDisabled()) {
       Logger.recordOutput("SwerveStates/Setpoints", new SwerveModuleState[] {});
-      Logger.recordOutput("SwerveStates/SetpointsOptimized", new SwerveModuleState[] {});
+      Logger.recordOutput("SwerveStates/SetpointsUnoptimized", new SwerveModuleState[] {});
     }
 
     // Send odometry updates to robot state
@@ -102,6 +121,11 @@ public class Drive extends SubsystemBase {
                   sampleTimestamps[i]));
     }
 
+    // Update current setpoint if not in velocity mode
+    if (!velocityMode) {
+      currentSetpoint = new SwerveSetpoint(getChassisSpeeds(), getModuleStates());
+    }
+
     // Update gyro alert
     gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.getMode() != Mode.SIM);
   }
@@ -112,22 +136,27 @@ public class Drive extends SubsystemBase {
    * @param speeds Speeds in meters/sec
    */
   public void runVelocity(ChassisSpeeds speeds) {
+    velocityMode = true;
     // Calculate module setpoints
-    ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
-    SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
-    SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, DriveConstants.maxLinearSpeed);
+    ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, Constants.loopPeriodSecs);
+    SwerveModuleState[] setpointStatesUnoptimized = kinematics.toSwerveModuleStates(discreteSpeeds);
+    currentSetpoint =
+        swerveSetpointGenerator.generateSetpoint(
+            DriveConstants.moduleLimitsFree,
+            currentSetpoint,
+            discreteSpeeds,
+            Constants.loopPeriodSecs);
+    SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
 
     // Log unoptimized setpoints and setpoint speeds
+    Logger.recordOutput("SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
     Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", discreteSpeeds);
+    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
 
     // Send setpoints to modules
     for (int i = 0; i < 4; i++) {
       modules[i].runSetpoint(setpointStates[i]);
     }
-
-    // Log optimized setpoints (runSetpoint mutates each state)
-    Logger.recordOutput("SwerveStates/SetpointsOptimized", setpointStates);
   }
 
   /**
@@ -137,14 +166,22 @@ public class Drive extends SubsystemBase {
    * @param moduleForces The forces applied to each module
    */
   public void runVelocity(ChassisSpeeds speeds, List<Vector<N2>> moduleForces) {
+    velocityMode = true;
     // Calculate module setpoints
-    ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, 0.02);
-    SwerveModuleState[] setpointStates = kinematics.toSwerveModuleStates(discreteSpeeds);
-    SwerveDriveKinematics.desaturateWheelSpeeds(setpointStates, DriveConstants.maxLinearSpeed);
+    ChassisSpeeds discreteSpeeds = ChassisSpeeds.discretize(speeds, Constants.loopPeriodSecs);
+    SwerveModuleState[] setpointStatesUnoptimized = kinematics.toSwerveModuleStates(discreteSpeeds);
+    currentSetpoint =
+        swerveSetpointGenerator.generateSetpoint(
+            DriveConstants.moduleLimitsFree,
+            currentSetpoint,
+            discreteSpeeds,
+            Constants.loopPeriodSecs);
+    SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
 
     // Log unoptimized setpoints and setpoint speeds
+    Logger.recordOutput("SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
     Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", discreteSpeeds);
+    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
 
     // Save module forces to swerve states for logging
     SwerveModuleState[] wheelForces = new SwerveModuleState[4];
@@ -166,13 +203,11 @@ public class Drive extends SubsystemBase {
       wheelForces[i] = new SwerveModuleState(wheelTorqueNm, setpointStates[i].angle);
     }
     Logger.recordOutput("SwerveStates/ModuleForces", wheelForces);
-
-    // Log optimized setpoints (runSetpoint mutates each state)
-    Logger.recordOutput("SwerveStates/SetpointsOptimized", setpointStates);
   }
 
   /** Runs the drive in a straight line with the specified drive output. */
   public void runCharacterization(double output) {
+    velocityMode = false;
     for (int i = 0; i < 4; i++) {
       modules[i].runCharacterization(output);
     }

@@ -9,6 +9,7 @@ package org.littletonrobotics.frc2025;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -17,6 +18,9 @@ import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
@@ -27,6 +31,7 @@ public class RobotContainer {
 
   // Subsystems
   private Drive drive;
+  private RollerSystem roller;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -46,6 +51,8 @@ public class RobotContainer {
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[1]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[2]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[3]));
+          roller =
+              new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
         }
         case DEVBOT -> {
           drive =
@@ -55,6 +62,8 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
+          roller =
+              new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
         }
         case SIMBOT -> {
           drive =
@@ -64,6 +73,8 @@ public class RobotContainer {
                   new ModuleIOSim(),
                   new ModuleIOSim(),
                   new ModuleIOSim());
+          roller =
+              new RollerSystem("Roller", new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 4, .1));
         }
       }
     }

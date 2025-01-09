@@ -114,12 +114,8 @@ public class Module {
     turnEncoderDisconnectedAlert.set(!inputs.turnEncoderConnected);
   }
 
-  /** Runs the module with the specified setpoint state. Mutates the state to optimize it. */
+  /** Runs the module with the specified setpoint state. */
   public void runSetpoint(SwerveModuleState state) {
-    // Optimize Velocity setpoint
-    state.optimize(getAngle());
-    state.cosineScale(inputs.turnPosition);
-
     // Apply setpoints
     double speedRadPerSec = state.speedMetersPerSecond / DriveConstants.wheelRadius;
     io.runDriveVelocity(speedRadPerSec, ffModel.calculate(speedRadPerSec));
@@ -128,7 +124,7 @@ public class Module {
 
   /**
    * Runs the module with the specified setpoint state and a setpoint wheel force used for
-   * torque-based feedforward. Does NOT mutate the state to optimize it.
+   * torque-based feedforward.
    */
   public void runSetpoint(SwerveModuleState state, double wheelTorqueNm) {
     // Apply setpoints
