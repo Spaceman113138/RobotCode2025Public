@@ -18,14 +18,18 @@ import edu.wpi.first.math.numbers.N2;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import lombok.Setter;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.RobotState;
+import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.swerve.SwerveSetpoint;
 import org.littletonrobotics.frc2025.util.swerve.SwerveSetpointGenerator;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -39,11 +43,21 @@ public class Drive extends SubsystemBase {
   private final Alert gyroDisconnectedAlert =
       new Alert("Disconnected gyro, using kinematics as fallback.", AlertType.kError);
 
+  private static final LoggedTunableNumber coastWaitTime =
+      new LoggedTunableNumber("Drive/CoastWaitTimeSeconds", 0.5);
+  private static final LoggedTunableNumber coastMetersPerSecondThreshold =
+      new LoggedTunableNumber("Drive/CoastMetersPerSecThreshold", .05);
+
+  private final Timer lastMovementTimer = new Timer();
+
   private final SwerveDriveKinematics kinematics =
       new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
   @AutoLogOutput(key = "Drive/VelocityMode")
   private boolean velocityMode = false;
+
+  @AutoLogOutput(key = "Drive/BrakeModeEnabled")
+  private boolean brakeModeEnabled = true;
 
   private SwerveSetpoint currentSetpoint =
       new SwerveSetpoint(
@@ -67,6 +81,8 @@ public class Drive extends SubsystemBase {
     modules[1] = new Module(frModuleIO, 1);
     modules[2] = new Module(blModuleIO, 2);
     modules[3] = new Module(brModuleIO, 3);
+    lastMovementTimer.start();
+    setBrakeMode(true);
 
     swerveSetpointGenerator =
         new SwerveSetpointGenerator(kinematics, DriveConstants.moduleTranslations);
@@ -74,6 +90,14 @@ public class Drive extends SubsystemBase {
     // Start odometry thread
     PhoenixOdometryThread.getInstance().start();
   }
+
+  public enum CoastRequest {
+    AUTOMATIC,
+    ALWAYS_BREAK,
+    ALWAYS_COAST
+  }
+
+  @Setter @AutoLogOutput private CoastRequest coastRequest = CoastRequest.AUTOMATIC;
 
   @Override
   public void periodic() {
@@ -121,6 +145,35 @@ public class Drive extends SubsystemBase {
                   sampleTimestamps[i]));
     }
 
+    // Update brake mode
+    // Reset movement timer if velocity above threshold
+    if (Arrays.stream(modules)
+        .anyMatch(
+            (module) ->
+                Math.abs(module.getVelocityMetersPerSec()) > coastMetersPerSecondThreshold.get())) {
+      lastMovementTimer.reset();
+    }
+
+    if (DriverStation.isEnabled()) {
+      coastRequest = CoastRequest.AUTOMATIC;
+    }
+
+    switch (coastRequest) {
+      case AUTOMATIC -> {
+        if (DriverStation.isEnabled()) {
+          setBrakeMode(true);
+        } else if (lastMovementTimer.hasElapsed(coastWaitTime.get())) {
+          setBrakeMode(false);
+        }
+      }
+      case ALWAYS_BREAK -> {
+        setBrakeMode(true);
+      }
+      case ALWAYS_COAST -> {
+        setBrakeMode(false);
+      }
+    }
+
     // Update current setpoint if not in velocity mode
     if (!velocityMode) {
       currentSetpoint = new SwerveSetpoint(getChassisSpeeds(), getModuleStates());
@@ -128,6 +181,14 @@ public class Drive extends SubsystemBase {
 
     // Update gyro alert
     gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.getMode() != Mode.SIM);
+  }
+
+  /** Set brake mode to {@code enabled} doesn't change brake mode if already set. */
+  private void setBrakeMode(boolean enabled) {
+    if (brakeModeEnabled != enabled) {
+      Arrays.stream(modules).forEach(module -> module.setBrakeMode(enabled));
+    }
+    brakeModeEnabled = enabled;
   }
 
   /**
