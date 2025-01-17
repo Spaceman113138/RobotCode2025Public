@@ -19,6 +19,7 @@ import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
@@ -88,6 +89,9 @@ public class RobotContainer {
               new ModuleIO() {},
               new ModuleIO() {},
               new ModuleIO() {});
+    }
+    if (roller == null) {
+      roller = new RollerSystem("Roller", new RollerSystemIO() {});
     }
 
     // Set up auto routines
