@@ -28,3 +28,18 @@ class CameraPoseObservation:
     error_0: float
     pose_1: Union[Pose3d, None]
     error_1: Union[float, None]
+
+
+@dataclass(frozen=True)
+class TagAngleObservation:
+    tag_id: int
+    corners: numpy.typing.NDArray[numpy.float64]
+    distance: float
+
+
+@dataclass(frozen=True)
+class ObjDetectObservation:
+    obj_class: int
+    confidence: float
+    corner_angles: numpy.typing.NDArray[numpy.float64]
+    corner_pixels: numpy.typing.NDArray[numpy.float64]

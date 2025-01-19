@@ -1,3 +1,5 @@
 # Northstar
 
-Northstar is 6328's AprilTag tracking system using OpenCV's ArUco module and NT4. This code is provided for reference, but **we do not provide support to other teams using it**. Please use [PhotonVision](https://photonvision.org) or [Limelight](https://limelightvision.io) instead.
+Northstar is 6328's AprilTag tracking and object detection system. This code is provided for reference, but **we do NOT provide support to other teams using it**. Please use [PhotonVision](https://photonvision.org) or [Limelight](https://limelightvision.io) instead.
+
+Object detection models can be found [here](https://drive.google.com/drive/folders/1l3Bx3FGBGiY3hcpaPtvrNNPMZHChCi9w?usp=sharing).

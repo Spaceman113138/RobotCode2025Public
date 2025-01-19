@@ -188,3 +188,7 @@ src/main/java/org/littletonrobotics/frc2025/BuildConstants.java
 
 # Generated paths
 src/main/deploy/trajectories/*.pathblob
+
+# Python
+__pycache__
+venv

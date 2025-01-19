@@ -77,7 +77,7 @@ class AVFoundationCapture(Capture):
             print("Restarting capture session")
             self._video.release()
             self._video = None
-            time.sleep(2)
+            sys.exit(1)
 
         if self._video == None:
             camera_id_split = config_store.remote_config.camera_id.split(":")
@@ -92,9 +92,10 @@ class AVFoundationCapture(Capture):
                         camera_vendor_id = camera_id_split[1]
                         camera_product_id = camera_id_split[2]
 
-                        subprocess.run(["./ns-iokit-ctl/build/ns_iokit_ctl", camera_vendor_id, camera_product_id, camera_location_id, str(config_store.remote_config.camera_auto_exposure), str(config_store.remote_config.camera_exposure), str(int(config_store.remote_config.camera_gain))], check=True)
+                        subprocess.run(["./ns-iokit-ctl/build/ns_iokit_ctl", camera_vendor_id, camera_product_id, camera_location_id, str(
+                            config_store.remote_config.camera_auto_exposure), str(config_store.remote_config.camera_exposure), str(int(config_store.remote_config.camera_gain))], check=True)
 
-                        self._video = cv2.VideoCapture(index)
+                        self._video = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
                         self._video.set(cv2.CAP_PROP_FRAME_WIDTH, config_store.remote_config.camera_resolution_width)
                         self._video.set(cv2.CAP_PROP_FRAME_HEIGHT, config_store.remote_config.camera_resolution_height)
                         break

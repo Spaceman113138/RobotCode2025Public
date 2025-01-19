@@ -1,7 +1,7 @@
 import cv2
 import numpy
 from config.config import ConfigStore
-from vision_types import FiducialImageObservation, FiducialPoseObservation
+from vision_types import FiducialImageObservation, FiducialPoseObservation, ObjDetectObservation, ObjDetectObservation
 
 
 def overlay_image_observation(image: cv2.Mat, observation: FiducialImageObservation) -> None:
@@ -13,3 +13,7 @@ def overlay_pose_observation(image: cv2.Mat, config_store: ConfigStore, observat
                       config_store.local_config.distortion_coefficients, observation.rvec_0, observation.tvec_0, config_store.remote_config.fiducial_size_m / 2)
     cv2.drawFrameAxes(image, config_store.local_config.camera_matrix,
                       config_store.local_config.distortion_coefficients, observation.rvec_1, observation.tvec_1, config_store.remote_config.fiducial_size_m / 2)
+
+def overlay_obj_detect_observation(image: cv2.Mat, observation: ObjDetectObservation) -> None: 
+    cv2.rectangle(image, (int(observation.corner_pixels[0][0]), int(observation.corner_pixels[0][1])), (int(observation.corner_pixels[3][0]), int(observation.corner_pixels[3][1])), (0, 0, 225), 2)
+    cv2.putText(image, str(observation.obj_class) + " (" + str(round(observation.confidence * 100)) + "%)", (int(observation.corner_pixels[0][0]), int(observation.corner_pixels[0][1] - 5)), cv2.FONT_HERSHEY_PLAIN, 2, (0, 0, 225), 2)

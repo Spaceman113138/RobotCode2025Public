@@ -13,7 +13,7 @@ from config.config import ConfigStore
 class StreamServer:
     """Interface for outputing camera frames."""
 
-    def start(self, config_store: ConfigStore) -> None:
+    def start(self, port: int) -> None:
         """Starts the output stream."""
         raise NotImplementedError
 
@@ -73,7 +73,7 @@ class MjpegServer(StreamServer):
                             if not self_mjpeg._has_frame:
                                 time.sleep(0.1)
                             else:
-                                pil_im = Image.fromarray(self_mjpeg._frame)
+                                pil_im = Image.fromarray(cv2.cvtColor(self_mjpeg._frame, cv2.COLOR_BGR2RGB))
                                 stream = BytesIO()
                                 pil_im.save(stream, format="JPEG")
                                 frame_data = stream.getvalue()
@@ -100,8 +100,8 @@ class MjpegServer(StreamServer):
         server = self.StreamingServer(("", port), self._make_handler())
         server.serve_forever()
 
-    def start(self, config_store: ConfigStore) -> None:
-        threading.Thread(target=self._run, daemon=True, args=(config_store.local_config.stream_port,)).start()
+    def start(self, port: int) -> None:
+        threading.Thread(target=self._run, daemon=True, args=(port,)).start()
 
     def set_frame(self, frame: cv2.Mat) -> None:
         self._frame = frame.copy()
