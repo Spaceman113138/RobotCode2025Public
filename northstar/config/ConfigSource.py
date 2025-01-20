@@ -1,9 +1,15 @@
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
+
 import json
 
 import cv2
 import ntcore
 import numpy
-
 from config.config import ConfigStore, RemoteConfig
 
 
@@ -60,26 +66,30 @@ class NTConfigSource(ConfigSource):
         # Initialize subscribers on first call
         if not self._init_complete:
             nt_table = ntcore.NetworkTableInstance.getDefault().getTable(
-                "/" + config_store.local_config.device_id + "/config")
+                "/" + config_store.local_config.device_id + "/config"
+            )
             self._camera_id_sub = nt_table.getStringTopic("camera_id").subscribe(RemoteConfig.camera_id)
-            self._camera_resolution_width_sub = nt_table.getIntegerTopic(
-                "camera_resolution_width").subscribe(RemoteConfig.camera_resolution_width)
-            self._camera_resolution_height_sub = nt_table.getIntegerTopic(
-                "camera_resolution_height").subscribe(RemoteConfig.camera_resolution_height)
-            self._camera_auto_exposure_sub = nt_table.getIntegerTopic(
-                "camera_auto_exposure").subscribe(RemoteConfig.camera_auto_exposure)
-            self._camera_exposure_sub = nt_table.getIntegerTopic(
-                "camera_exposure").subscribe(RemoteConfig.camera_exposure)
-            self._camera_gain_sub = nt_table.getDoubleTopic(
-                "camera_gain").subscribe(RemoteConfig.camera_gain)
-            self._fiducial_size_m_sub = nt_table.getDoubleTopic(
-                "fiducial_size_m").subscribe(RemoteConfig.fiducial_size_m)
-            self._tag_layout_sub = nt_table.getStringTopic(
-                "tag_layout").subscribe("")
+            self._camera_resolution_width_sub = nt_table.getIntegerTopic("camera_resolution_width").subscribe(
+                RemoteConfig.camera_resolution_width
+            )
+            self._camera_resolution_height_sub = nt_table.getIntegerTopic("camera_resolution_height").subscribe(
+                RemoteConfig.camera_resolution_height
+            )
+            self._camera_auto_exposure_sub = nt_table.getIntegerTopic("camera_auto_exposure").subscribe(
+                RemoteConfig.camera_auto_exposure
+            )
+            self._camera_exposure_sub = nt_table.getIntegerTopic("camera_exposure").subscribe(
+                RemoteConfig.camera_exposure
+            )
+            self._camera_gain_sub = nt_table.getDoubleTopic("camera_gain").subscribe(RemoteConfig.camera_gain)
+            self._fiducial_size_m_sub = nt_table.getDoubleTopic("fiducial_size_m").subscribe(
+                RemoteConfig.fiducial_size_m
+            )
+            self._tag_layout_sub = nt_table.getStringTopic("tag_layout").subscribe("")
             self._is_recording_sub = nt_table.getBooleanTopic("is_recording").subscribe(False)
             self._timestamp_sub = nt_table.getIntegerTopic("timestamp").subscribe(0)
             self._init_complete = True
-            
+
         # Read config data
         config_store.remote_config.camera_id = self._camera_id_sub.get()
         config_store.remote_config.camera_resolution_width = self._camera_resolution_width_sub.get()

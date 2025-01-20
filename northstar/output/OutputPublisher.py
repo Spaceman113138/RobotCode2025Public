@@ -1,3 +1,10 @@
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
+
 import math
 from typing import List, Union
 
@@ -10,13 +17,22 @@ class OutputPublisher:
     def send_apriltag_fps(self, config_store: ConfigStore, timestamp: float, fps: int) -> None:
         raise NotImplementedError
 
-    def send_apriltag_observation(self, config_store: ConfigStore, timestamp: float, observation: Union[CameraPoseObservation, None], tag_angles: List[TagAngleObservation], demo_observation: Union[FiducialPoseObservation, None]) -> None:
+    def send_apriltag_observation(
+        self,
+        config_store: ConfigStore,
+        timestamp: float,
+        observation: Union[CameraPoseObservation, None],
+        tag_angles: List[TagAngleObservation],
+        demo_observation: Union[FiducialPoseObservation, None],
+    ) -> None:
         raise NotImplementedError
-    
-    def send_objdetect_fps(self, config_store: ConfigStore, timestamp:float, fps: int) -> None:
+
+    def send_objdetect_fps(self, config_store: ConfigStore, timestamp: float, fps: int) -> None:
         raise NotImplementedError
-    
-    def send_objdetect_observation(self, config_store: ConfigStore, timestamp: float, observations: List[ObjDetectObservation]) -> None:
+
+    def send_objdetect_observation(
+        self, config_store: ConfigStore, timestamp: float, observations: List[ObjDetectObservation]
+    ) -> None:
         raise NotImplementedError
 
 
@@ -33,21 +49,32 @@ class NTOutputPublisher(OutputPublisher):
         if not self._init_complete:
             self._init_complete = True
             nt_table = ntcore.NetworkTableInstance.getDefault().getTable(
-                "/" + config.local_config.device_id + "/output")
+                "/" + config.local_config.device_id + "/output"
+            )
             self._observations_pub = nt_table.getDoubleArrayTopic("observations").publish(
-                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
+                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True)
+            )
             self._demo_observations_pub = nt_table.getDoubleArrayTopic("demo_observations").publish(
-                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
+                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True)
+            )
             self._apriltags_fps_pub = nt_table.getIntegerTopic("fps_apriltags").publish()
             self._objdetect_fps_pub = nt_table.getIntegerTopic("fps_objdetect").publish()
             self._objdetect_observations_pub = nt_table.getDoubleArrayTopic("objdetect_observations").publish(
-                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True))
+                ntcore.PubSubOptions(periodic=0, sendAll=True, keepDuplicates=True)
+            )
 
     def send_apriltag_fps(self, config_store: ConfigStore, timestamp: float, fps: int) -> None:
         self._check_init(config_store)
         self._apriltags_fps_pub.set(fps)
 
-    def send_apriltag_observation(self, config_store: ConfigStore, timestamp: float, observation: Union[CameraPoseObservation, None], tag_angles: List[TagAngleObservation], demo_observation: Union[FiducialPoseObservation, None]) -> None:
+    def send_apriltag_observation(
+        self,
+        config_store: ConfigStore,
+        timestamp: float,
+        observation: Union[CameraPoseObservation, None],
+        tag_angles: List[TagAngleObservation],
+        demo_observation: Union[FiducialPoseObservation, None],
+    ) -> None:
         self._check_init(config_store)
 
         # Send data
@@ -100,13 +127,15 @@ class NTOutputPublisher(OutputPublisher):
         self._observations_pub.set(observation_data, math.floor(timestamp * 1000000))
         self._demo_observations_pub.set(demo_observation_data, math.floor(timestamp * 1000000))
 
-    def send_objdetect_fps(self, config_store: ConfigStore, timestamp:float, fps: int) -> None:
+    def send_objdetect_fps(self, config_store: ConfigStore, timestamp: float, fps: int) -> None:
         self._check_init(config_store)
         self._objdetect_fps_pub.set(fps)
 
-    def send_objdetect_observation(self, config_store: ConfigStore, timestamp: float, observations: List[ObjDetectObservation]) -> None:
+    def send_objdetect_observation(
+        self, config_store: ConfigStore, timestamp: float, observations: List[ObjDetectObservation]
+    ) -> None:
         self._check_init(config_store)
-    
+
         observation_data: List[float] = []
         for observation in observations:
             observation_data.append(observation.obj_class)

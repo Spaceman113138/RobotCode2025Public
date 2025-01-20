@@ -1,3 +1,10 @@
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
+
 import socketserver
 import threading
 import time
@@ -6,8 +13,6 @@ from io import BytesIO
 
 import cv2
 from PIL import Image
-
-from config.config import ConfigStore
 
 
 class StreamServer:

@@ -1,14 +1,21 @@
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
+
 import dataclasses
+import subprocess
 import sys
 import time
 from typing import Tuple, Union
 
+import AVFoundation
 import cv2
 import numpy
-from pypylon import pylon
 from config.config import ConfigStore
-import AVFoundation
-import subprocess
+from pypylon import pylon
 
 
 class Capture:
@@ -31,11 +38,18 @@ class Capture:
         remote_a = config_a.remote_config
         remote_b = config_b.remote_config
 
-        return remote_a.camera_id != remote_b.camera_id or remote_a.camera_resolution_width != remote_b.camera_resolution_width or remote_a.camera_resolution_height != remote_b.camera_resolution_height or remote_a.camera_auto_exposure != remote_b.camera_auto_exposure or remote_a.camera_exposure != remote_b.camera_exposure or remote_a.camera_gain != remote_b.camera_gain
+        return (
+            remote_a.camera_id != remote_b.camera_id
+            or remote_a.camera_resolution_width != remote_b.camera_resolution_width
+            or remote_a.camera_resolution_height != remote_b.camera_resolution_height
+            or remote_a.camera_auto_exposure != remote_b.camera_auto_exposure
+            or remote_a.camera_exposure != remote_b.camera_exposure
+            or remote_a.camera_gain != remote_b.camera_gain
+        )
 
 
 class DefaultCapture(Capture):
-    """"Read from camera with default OpenCV config."""
+    """ "Read from camera with default OpenCV config."""
 
     def __init__(self) -> None:
         pass
@@ -64,7 +78,7 @@ class DefaultCapture(Capture):
 
 
 class AVFoundationCapture(Capture):
-    """"Read from camera with OpenCV and AVFoundation."""
+    """ "Read from camera with OpenCV and AVFoundation."""
 
     def __init__(self) -> None:
         pass
@@ -92,16 +106,27 @@ class AVFoundationCapture(Capture):
                         camera_vendor_id = camera_id_split[1]
                         camera_product_id = camera_id_split[2]
 
-                        subprocess.run(["./ns-iokit-ctl/build/ns_iokit_ctl", camera_vendor_id, camera_product_id, camera_location_id, str(
-                            config_store.remote_config.camera_auto_exposure), str(config_store.remote_config.camera_exposure), str(int(config_store.remote_config.camera_gain))], check=True)
+                        subprocess.run(
+                            [
+                                "./ns-iokit-ctl/build/ns_iokit_ctl",
+                                camera_vendor_id,
+                                camera_product_id,
+                                camera_location_id,
+                                str(config_store.remote_config.camera_auto_exposure),
+                                str(config_store.remote_config.camera_exposure),
+                                str(int(config_store.remote_config.camera_gain)),
+                            ],
+                            check=True,
+                        )
 
                         self._video = cv2.VideoCapture(index, cv2.CAP_AVFOUNDATION)
                         self._video.set(cv2.CAP_PROP_FRAME_WIDTH, config_store.remote_config.camera_resolution_width)
                         self._video.set(cv2.CAP_PROP_FRAME_HEIGHT, config_store.remote_config.camera_resolution_height)
                         break
 
-        self._last_config = ConfigStore(dataclasses.replace(config_store.local_config),
-                                        dataclasses.replace(config_store.remote_config))
+        self._last_config = ConfigStore(
+            dataclasses.replace(config_store.local_config), dataclasses.replace(config_store.remote_config)
+        )
 
         if self._video == None:
             if config_store.remote_config.camera_id != "":
@@ -152,8 +177,9 @@ class PylonCapture(Capture):
                 self._camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
                 print("Capture session ready")
 
-        self._last_config = ConfigStore(dataclasses.replace(config_store.local_config),
-                                        dataclasses.replace(config_store.remote_config))
+        self._last_config = ConfigStore(
+            dataclasses.replace(config_store.local_config), dataclasses.replace(config_store.remote_config)
+        )
 
         if self._camera is None:
             return False, None
@@ -166,7 +192,7 @@ class PylonCapture(Capture):
 
 
 class GStreamerCapture(Capture):
-    """"Read from camera with GStreamer."""
+    """ "Read from camera with GStreamer."""
 
     def __init__(self) -> None:
         pass
@@ -186,12 +212,27 @@ class GStreamerCapture(Capture):
                 print("No camera ID, waiting to start capture session")
             else:
                 print("Starting capture session")
-                self._video = cv2.VideoCapture("v4l2src device=" + str(config_store.remote_config.camera_id) + " extra_controls=\"c,exposure_auto=" + str(config_store.remote_config.camera_auto_exposure) + ",exposure_absolute=" + str(
-                    config_store.remote_config.camera_exposure) + ",gain=" + str(int(config_store.remote_config.camera_gain)) + ",sharpness=0,brightness=0\" ! image/jpeg,format=MJPG,width=" + str(config_store.remote_config.camera_resolution_width) + ",height=" + str(config_store.remote_config.camera_resolution_height) + " ! jpegdec ! video/x-raw ! appsink drop=1", cv2.CAP_GSTREAMER)
+                self._video = cv2.VideoCapture(
+                    "v4l2src device="
+                    + str(config_store.remote_config.camera_id)
+                    + ' extra_controls="c,exposure_auto='
+                    + str(config_store.remote_config.camera_auto_exposure)
+                    + ",exposure_absolute="
+                    + str(config_store.remote_config.camera_exposure)
+                    + ",gain="
+                    + str(int(config_store.remote_config.camera_gain))
+                    + ',sharpness=0,brightness=0" ! image/jpeg,format=MJPG,width='
+                    + str(config_store.remote_config.camera_resolution_width)
+                    + ",height="
+                    + str(config_store.remote_config.camera_resolution_height)
+                    + " ! jpegdec ! video/x-raw ! appsink drop=1",
+                    cv2.CAP_GSTREAMER,
+                )
                 print("Capture session ready")
 
-        self._last_config = ConfigStore(dataclasses.replace(config_store.local_config),
-                                        dataclasses.replace(config_store.remote_config))
+        self._last_config = ConfigStore(
+            dataclasses.replace(config_store.local_config), dataclasses.replace(config_store.remote_config)
+        )
 
         if self._video != None:
             retval, image = self._video.read()
@@ -209,5 +250,5 @@ CAPTURE_IMPLS = {
     "": DefaultCapture,
     "avfoundation": AVFoundationCapture,
     "pylon": PylonCapture,
-    "gstreamer": GStreamerCapture
+    "gstreamer": GStreamerCapture,
 }

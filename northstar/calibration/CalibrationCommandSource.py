@@ -1,5 +1,11 @@
-import ntcore
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
 
+import ntcore
 from config.config import ConfigStore
 
 
@@ -19,7 +25,8 @@ class NTCalibrationCommandSource(CalibrationCommandSource):
     def _init(self, config_store: ConfigStore):
         if not self._init_complete:
             nt_table = ntcore.NetworkTableInstance.getDefault().getTable(
-                "/" + config_store.local_config.device_id + "/calibration")
+                "/" + config_store.local_config.device_id + "/calibration"
+            )
             self._active_entry = nt_table.getBooleanTopic("active").getEntry(False)
             self._capture_flag_entry = nt_table.getBooleanTopic("capture_flag").getEntry(False)
             self._active_entry.set(False)

@@ -1,10 +1,16 @@
+# Copyright (c) 2025 FRC 6328
+# http://github.com/Mechanical-Advantage
+#
+# Use of this source code is governed by an MIT-style
+# license that can be found in the LICENSE file at
+# the root directory of this project.
+
 import datetime
 import os
 from typing import List
 
 import cv2
 import numpy
-
 from config.ConfigSource import FileConfigSource
 
 
@@ -30,7 +36,8 @@ class CalibrationSession:
 
             # Find Charuco corners
             (retval, charuco_corners, charuco_ids) = cv2.aruco.interpolateCornersCharuco(
-                corners, ids, image, self._charuco_board)
+                corners, ids, image, self._charuco_board
+            )
             if retval:
                 cv2.aruco.drawDetectedCornersCharuco(image, charuco_corners, charuco_ids)
 
@@ -49,7 +56,8 @@ class CalibrationSession:
             os.remove(FileConfigSource.CALIBRATION_FILENAME)
 
         (retval, camera_matrix, distortion_coefficients, rvecs, tvecs) = cv2.aruco.calibrateCameraCharuco(
-            self._all_charuco_corners, self._all_charuco_ids, self._charuco_board, self._imsize, None, None)
+            self._all_charuco_corners, self._all_charuco_ids, self._charuco_board, self._imsize, None, None
+        )
 
         if retval:
             calibration_store = cv2.FileStorage(FileConfigSource.CALIBRATION_FILENAME, cv2.FILE_STORAGE_WRITE)
