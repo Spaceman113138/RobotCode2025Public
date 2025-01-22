@@ -101,7 +101,7 @@ public class ModuleIODev implements ModuleIO {
     // Configure turn motor
     turnConfig.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     turnConfig.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
-    turnConfig.Feedback.RotorToSensorRatio = turnReduction;
+    turnConfig.Feedback.SensorToMechanismRatio = turnReduction;
     turnConfig.ClosedLoopGeneral.ContinuousWrap = true;
     turnConfig.TorqueCurrent.PeakForwardTorqueCurrent = turnCurrentLimitAmps;
     turnConfig.TorqueCurrent.PeakReverseTorqueCurrent = -turnCurrentLimitAmps;

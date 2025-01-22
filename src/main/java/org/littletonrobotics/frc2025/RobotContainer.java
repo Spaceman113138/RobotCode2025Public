@@ -22,6 +22,9 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
+import org.littletonrobotics.frc2025.subsystems.vision.Vision;
+import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
+import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
@@ -32,6 +35,7 @@ public class RobotContainer {
 
   // Subsystems
   private Drive drive;
+  private Vision vision;
   private RollerSystem roller;
 
   // Controller
@@ -52,6 +56,12 @@ public class RobotContainer {
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[1]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[2]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[3]));
+          vision =
+              new Vision(
+                  new VisionIONorthstar(0),
+                  new VisionIONorthstar(1),
+                  new VisionIONorthstar(2),
+                  new VisionIONorthstar(3));
           roller =
               new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
         }
@@ -63,6 +73,7 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
+          vision = new Vision(new VisionIONorthstar(0));
           roller =
               new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
         }
@@ -92,6 +103,16 @@ public class RobotContainer {
     }
     if (roller == null) {
       roller = new RollerSystem("Roller", new RollerSystemIO() {});
+    }
+
+    if (vision == null) {
+      switch (Constants.getRobot()) {
+        case COMPBOT ->
+            vision =
+                new Vision(
+                    new VisionIO() {}, new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
+        case DEVBOT -> vision = new Vision(new VisionIO() {});
+      }
     }
 
     // Set up auto routines
@@ -153,7 +174,7 @@ public class RobotContainer {
                             .resetPose(
                                 new Pose2d(
                                     RobotState.getInstance().getEstimatedPose().getTranslation(),
-                                    new Rotation2d())),
+                                    AllianceFlipUtil.apply(new Rotation2d()))),
                     drive)
                 .ignoringDisable(true));
   }

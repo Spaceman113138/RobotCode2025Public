@@ -6,6 +6,7 @@
 # the root directory of this project.
 
 import math
+from typing import Union
 
 import cv2
 import numpy as np
@@ -20,7 +21,7 @@ class TagAngleCalculator:
 
     def calc_tag_angles(
         self, image_observation: FiducialImageObservation, config_store: ConfigStore
-    ) -> TagAngleObservation:
+    ) -> Union[TagAngleObservation, None]:
         raise NotImplementedError
 
 
@@ -32,7 +33,7 @@ class CameraMatrixTagAngleCalculator(TagAngleCalculator):
 
     def calc_tag_angles(
         self, image_observation: FiducialImageObservation, config_store: ConfigStore
-    ) -> TagAngleObservation:
+    ) -> Union[TagAngleObservation, None]:
         # Undistort corners
         corners_undistorted = cv2.undistortPoints(
             image_observation.corners,
@@ -55,6 +56,8 @@ class CameraMatrixTagAngleCalculator(TagAngleCalculator):
         pose_observation: FiducialPoseObservation = self._tag_pose_estimator.solve_fiducial_pose(
             image_observation, config_store
         )
+        if pose_observation == None:
+            return None
         distance: float = 0
         if pose_observation.error_0 < pose_observation.error_1:
             distance = pose_observation.pose_0.translation().norm()

@@ -55,6 +55,7 @@ def apriltag_worker(
         tag_angle_observations = [
             tag_angle_calculator.calc_tag_angles(x, config) for x in image_observations if x.tag_id != DEMO_ID
         ]
+        tag_angle_observations = [x for x in tag_angle_observations if x != None]
         demo_image_observations = [x for x in image_observations if x.tag_id == DEMO_ID]
         demo_pose_observation: Union[FiducialPoseObservation, None] = None
         if len(demo_image_observations) > 0:

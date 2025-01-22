@@ -10,21 +10,19 @@ package org.littletonrobotics.frc2025.util;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
+import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.ModuleForce;
 import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.VehicleState;
 
 public class AllianceFlipUtil {
-  public static double fieldWidth = Units.feetToMeters(26.0) + Units.inchesToMeters(5.0);
-  public static double fieldLength = Units.feetToMeters(57.0) + Units.inchesToMeters(6.875);
 
   public static double applyX(double x) {
-    return shouldFlip() ? fieldLength - x : x;
+    return shouldFlip() ? FieldConstants.fieldLength - x : x;
   }
 
   public static double applyY(double y) {
-    return shouldFlip() ? fieldWidth - y : y;
+    return shouldFlip() ? FieldConstants.fieldWidth - y : y;
   }
 
   public static Translation2d apply(Translation2d translation) {

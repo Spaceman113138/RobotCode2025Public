@@ -51,10 +51,13 @@ class SquareTargetPoseEstimator(PoseEstimator):
             )
         except:
             return None
-        return FiducialPoseObservation(
-            image_observation.tag_id,
-            openCvPoseToWpilib(tvecs[0], rvecs[0]),
-            errors[0][0],
-            openCvPoseToWpilib(tvecs[1], rvecs[1]),
-            errors[1][0],
-        )
+        try:
+            return FiducialPoseObservation(
+                image_observation.tag_id,
+                openCvPoseToWpilib(tvecs[0], rvecs[0]),
+                errors[0][0],
+                openCvPoseToWpilib(tvecs[1], rvecs[1]),
+                errors[1][0],
+            )
+        except:
+            return None
