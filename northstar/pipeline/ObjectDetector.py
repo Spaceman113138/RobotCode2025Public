@@ -38,13 +38,15 @@ class CoreMLObjectDetector(ObjectDetector):
             print("Finished loading object detection model")
 
         # Create scaled frame for model
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         image_scaled = np.zeros((640, 640, 3), dtype=np.uint8)
         scaled_height = int(640 / (image.shape[1] / image.shape[0]))
         bar_height = int((640 - scaled_height) / 2)
         image_scaled[bar_height : bar_height + scaled_height, 0:640] = cv2.resize(image, (640, scaled_height))
 
         # Run CoreML model
-        image_coreml = Image.fromarray(cv2.cvtColor(image_scaled, cv2.COLOR_BGR2RGB))
+        image_coreml = Image.fromarray(image_scaled)
         prediction = self._model.predict({"image": image_coreml})
 
         observations: List[ObjDetectObservation] = []

@@ -20,7 +20,7 @@ class VideoWriter:
     def __init__(self) -> None:
         raise NotImplementedError
 
-    def start(self, config: ConfigStore) -> None:
+    def start(self, config: ConfigStore, is_gray: bool) -> None:
         raise NotImplementedError
 
     def stop(self) -> None:
@@ -34,7 +34,7 @@ class FFmpegVideoWriter(VideoWriter):
     def __init__(self) -> None:
         pass
 
-    def start(self, config: ConfigStore) -> None:
+    def start(self, config: ConfigStore, is_gray: bool) -> None:
         filename = (
             config.local_config.video_folder
             + config.local_config.device_id
@@ -51,7 +51,7 @@ class FFmpegVideoWriter(VideoWriter):
                 + "x"
                 + str(config.remote_config.camera_resolution_height),
                 "-pixel_format",
-                "bgr24",
+                "gray" if is_gray else "rgb24",
                 "-r",
                 str(FRAMERATE),
                 "-re",

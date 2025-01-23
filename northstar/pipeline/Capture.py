@@ -9,6 +9,7 @@ import dataclasses
 import subprocess
 import sys
 import time
+import traceback
 from typing import Tuple, Union
 
 import AVFoundation
@@ -146,8 +147,8 @@ class AVFoundationCapture(Capture):
 class PylonCapture(Capture):
     """Reads from a Basler camera using pylon."""
 
-    def __init__(self) -> None:
-        pass
+    def __init__(self, mode: str = "") -> None:
+        self._mode = mode
 
     _camera: Union[None, pylon.InstantCamera] = None
     _last_config: ConfigStore
@@ -170,10 +171,24 @@ class PylonCapture(Capture):
                 self._camera = pylon.InstantCamera(device)
                 self._camera.Open()
                 self._camera.GetNodeMap().GetNode("DeviceLinkThroughputLimitMode").SetValue("On")
-                self._camera.GetNodeMap().GetNode("DeviceLinkThroughputLimit").SetValue(int(250e6))
+                max_bandwidth = int(150e6) if self._mode == "color" else int(250e6)
+                self._camera.GetNodeMap().GetNode("DeviceLinkThroughputLimit").SetValue(max_bandwidth)
+                self._camera.GetNodeMap().GetNode("ExposureAuto").SetValue("Off")
                 self._camera.GetNodeMap().GetNode("ExposureTime").SetValue(config_store.remote_config.camera_exposure)
-                self._camera.GetNodeMap().GetNode("BslBrightness").SetValue(config_store.remote_config.camera_gain)
-                self._camera.GetNodeMap().GetNode("BslContrastMode").SetValue("SCurve")
+                self._camera.GetNodeMap().GetNode("GainAuto").SetValue("Off")
+                self._camera.GetNodeMap().GetNode("Gain").SetValue(config_store.remote_config.camera_gain)
+                
+                if self._mode == "color":
+                    self._camera.GetNodeMap().GetNode("BinningHorizontal").SetValue(2)
+                    self._camera.GetNodeMap().GetNode("BinningVertical").SetValue(2)
+                    self._camera.GetNodeMap().GetNode("PixelFormat").SetValue("RGB8")
+
+                elif self._mode == "cropped":
+                    self._camera.GetNodeMap().GetNode("Width").SetValue(1600)
+                    self._camera.GetNodeMap().GetNode("Height").SetValue(1200)
+                    self._camera.GetNodeMap().GetNode("OffsetX").SetValue(168)
+                    self._camera.GetNodeMap().GetNode("OffsetY").SetValue(8)
+
                 self._camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
                 print("Capture session ready")
 
@@ -186,7 +201,11 @@ class PylonCapture(Capture):
         else:
             with self._camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException) as grab_result:
                 if grab_result.GrabSucceeded:
-                    return True, grab_result.Array
+                    try:
+                        return True, grab_result.Array
+                    except Exception:
+                        print("Error when capturing frame:", traceback.format_exc())
+                        return False, None
                 else:
                     return False, None
 
@@ -249,6 +268,8 @@ class GStreamerCapture(Capture):
 CAPTURE_IMPLS = {
     "": DefaultCapture,
     "avfoundation": AVFoundationCapture,
-    "pylon": PylonCapture,
+    "pylon": lambda: PylonCapture(),
+    "pylon-color": lambda: PylonCapture("color"),
+    "pylon-cropped": lambda: PylonCapture("cropped"),
     "gstreamer": GStreamerCapture,
 }

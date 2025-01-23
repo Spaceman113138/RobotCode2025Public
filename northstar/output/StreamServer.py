@@ -78,7 +78,7 @@ class MjpegServer(StreamServer):
                             if not self_mjpeg._has_frame:
                                 time.sleep(0.1)
                             else:
-                                pil_im = Image.fromarray(cv2.cvtColor(self_mjpeg._frame, cv2.COLOR_BGR2RGB))
+                                pil_im = Image.fromarray(self_mjpeg._frame)
                                 stream = BytesIO()
                                 pil_im.save(stream, format="JPEG")
                                 frame_data = stream.getvalue()

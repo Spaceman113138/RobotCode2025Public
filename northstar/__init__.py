@@ -83,7 +83,7 @@ if __name__ == "__main__":
         # Start and stop recording
         if config.remote_config.is_recording and not was_recording:
             print("Starting recording")
-            video_writer.start(config)
+            video_writer.start(config, len(image.shape) == 2)
         elif not config.remote_config.is_recording and was_recording:
             print("Stopping recording")
             video_writer.stop()
