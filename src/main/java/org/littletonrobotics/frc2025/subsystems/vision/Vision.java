@@ -11,18 +11,21 @@ import edu.wpi.first.apriltag.AprilTagFieldLayout;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
+import org.littletonrobotics.frc2025.RobotState.AlgaeTxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.TxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.VisionObservation;
 import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 
 /** Vision subsystem for vision. */
 @ExtensionMethod({GeomUtil.class})
@@ -36,6 +39,7 @@ public class Vision extends VirtualSubsystem {
   private static final double xyStdDevCoefficient = 0.005;
   private static final double thetaStdDevCoefficient = 0.01;
   private static final double demoTagPosePersistenceSecs = 0.5;
+  private static final double confidenceThreshold = 0.8;
 
   public static final Pose3d[] cameraPoses =
       switch (Constants.getRobot()) {
@@ -91,6 +95,8 @@ public class Vision extends VirtualSubsystem {
   private final VisionIO[] io;
   private final AprilTagVisionIOInputsAutoLogged[] aprilTagInputs;
   private final ObjDetectVisionIOInputsAutoLogged[] objDetectInputs;
+  private final LoggedNetworkBoolean recordingRequest =
+      new LoggedNetworkBoolean("/SmartDashboard/Enable Recording", false);
 
   private final Map<Integer, Double> lastFrameTimes = new HashMap<>();
   private final Map<Integer, Double> lastTagDetectionTimes = new HashMap<>();
@@ -122,11 +128,18 @@ public class Vision extends VirtualSubsystem {
       Logger.processInputs("ObjDetectVision/Inst" + i, objDetectInputs[i]);
     }
 
+    // Update recording state
+    boolean shouldRecord = DriverStation.isFMSAttached() || recordingRequest.get();
+    for (var ioInst : io) {
+      ioInst.setRecording(shouldRecord);
+    }
+
     // Loop over instances
     List<Pose2d> allRobotPoses = new ArrayList<>();
     List<Pose3d> allRobotPoses3d = new ArrayList<>();
     List<VisionObservation> allVisionObservations = new ArrayList<>();
     Map<Integer, TxTyObservation> allTxTyObservations = new HashMap<>();
+    List<AlgaeTxTyObservation> allAlgaeTxTyObservations = new ArrayList<>();
     for (int instanceIndex = 0; instanceIndex < io.length; instanceIndex++) {
       // Loop over frames
       for (int frameIndex = 0;
@@ -298,6 +311,26 @@ public class Vision extends VirtualSubsystem {
         }
       }
 
+      // Record algae observations
+      for (int frameIndex = 0;
+          frameIndex < objDetectInputs[instanceIndex].timestamps.length;
+          frameIndex++) {
+        double[] frame = objDetectInputs[instanceIndex].frames[frameIndex];
+        for (int i = 0; i < frame.length; i += 10) {
+          if (frame[i + 1] > confidenceThreshold) {
+            double[] tx = new double[4];
+            double[] ty = new double[4];
+            for (int z = 0; z < 4; z++) {
+              tx[z] = frame[i + 2 + (2 * z)];
+              ty[z] = frame[i + 2 + (2 * z) + 1];
+            }
+            allAlgaeTxTyObservations.add(
+                new AlgaeTxTyObservation(
+                    instanceIndex, tx, ty, objDetectInputs[instanceIndex].timestamps[frameIndex]));
+          }
+        }
+      }
+
       // Record demo tag pose
       if (aprilTagInputs[instanceIndex].demoFrame.length > 0) {
         var values = aprilTagInputs[instanceIndex].demoFrame;
@@ -406,6 +439,9 @@ public class Vision extends VirtualSubsystem {
           .sorted(Comparator.comparingDouble(VisionObservation::timestamp))
           .forEach(RobotState.getInstance()::addVisionObservation);
       allTxTyObservations.values().stream().forEach(RobotState.getInstance()::addTxTyObservation);
+      allAlgaeTxTyObservations.stream()
+          .sorted(Comparator.comparingDouble(AlgaeTxTyObservation::timestamp))
+          .forEach(RobotState.getInstance()::addAlgaeTxTyObservation);
     }
   }
 }

@@ -19,6 +19,8 @@ class CalibrationSession:
     _all_charuco_ids: List[numpy.ndarray] = []
     _imsize = None
 
+    NEW_CALIBRATION_FILENAME = "calibration_new.json"
+
     def __init__(self) -> None:
         self._aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_5X5_1000)
         self._aruco_params = cv2.aruco.DetectorParameters()
@@ -52,15 +54,15 @@ class CalibrationSession:
             print("ERROR: No calibration data")
             return
 
-        if os.path.exists(FileConfigSource.CALIBRATION_FILENAME):
-            os.remove(FileConfigSource.CALIBRATION_FILENAME)
+        if os.path.exists(self.NEW_CALIBRATION_FILENAME):
+            os.remove(self.NEW_CALIBRATION_FILENAME)
 
         (retval, camera_matrix, distortion_coefficients, rvecs, tvecs) = cv2.aruco.calibrateCameraCharuco(
             self._all_charuco_corners, self._all_charuco_ids, self._charuco_board, self._imsize, None, None
         )
 
         if retval:
-            calibration_store = cv2.FileStorage(FileConfigSource.CALIBRATION_FILENAME, cv2.FILE_STORAGE_WRITE)
+            calibration_store = cv2.FileStorage(self.NEW_CALIBRATION_FILENAME, cv2.FILE_STORAGE_WRITE)
             calibration_store.write("calibration_date", str(datetime.datetime.now()))
             calibration_store.write("camera_resolution", self._imsize)
             calibration_store.write("camera_matrix", camera_matrix)

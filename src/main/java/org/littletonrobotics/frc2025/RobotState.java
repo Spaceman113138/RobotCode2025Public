@@ -19,10 +19,14 @@ import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.Getter;
+import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.littletonrobotics.frc2025.subsystems.vision.Vision;
 import org.littletonrobotics.frc2025.util.GeomUtil;
@@ -30,12 +34,14 @@ import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
+@ExtensionMethod({GeomUtil.class})
 public class RobotState {
   // Must be less than 2.0
   private static final LoggedTunableNumber txTyObservationStaleSecs =
       new LoggedTunableNumber("RobotState/TxTyObservationStaleSeconds", 0.5);
 
   private static final double poseBufferSizeSec = 2.0;
+  private static final double algaePersistanceTime = 2.0;
   private static final Matrix<N3, N1> odometryStateStdDevs =
       new Matrix<>(VecBuilder.fill(0.003, 0.003, 0.002));
   private static final Map<Integer, Pose2d> tagPoses2d = new HashMap<>();
@@ -84,6 +90,7 @@ public class RobotState {
   private Rotation2d gyroOffset = new Rotation2d();
 
   private final Map<Integer, TxTyPoseRecord> txTyPoses = new HashMap<>();
+  private Set<AlgaePoseRecord> algaePoses = new HashSet<>();
 
   private RobotState() {
     for (int i = 0; i < 3; ++i) {
@@ -248,17 +255,80 @@ public class RobotState {
     return sample.map(pose2d -> data.pose().plus(new Transform2d(pose2d, odometryPose)));
   }
 
+  public void addAlgaeTxTyObservation(AlgaeTxTyObservation observation) {
+    var oldOdometryPose = poseBuffer.getSample(observation.timestamp());
+    if (oldOdometryPose.isEmpty()) {
+      return;
+    }
+    Pose2d fieldToRobot =
+        estimatedPose.transformBy(new Transform2d(odometryPose, oldOdometryPose.get()));
+    Pose3d robotToCamera = Vision.cameraPoses[observation.camera()];
+
+    // Average tx's and ty's
+    double tx = 0.0;
+    double ty = 0.0;
+    for (int i = 0; i < 4; i++) {
+      tx += observation.tx()[i];
+      ty += observation.ty()[i];
+    }
+    tx /= 4.0;
+    ty /= 4.0;
+    double cameraToAlgaeAngle = -robotToCamera.getRotation().getY() - ty;
+    if (cameraToAlgaeAngle >= 0) {
+      return;
+    }
+    double cameraToAlgaeNorm =
+        (FieldConstants.algaeDiameter / 2 - robotToCamera.getZ())
+            / Math.tan(-robotToCamera.getRotation().getY() - ty);
+    Pose2d fieldToCamera = fieldToRobot.transformBy(robotToCamera.toPose2d().toTransform2d());
+    Pose2d fieldToAlgae =
+        fieldToCamera
+            .transformBy(new Transform2d(Translation2d.kZero, new Rotation2d(-tx)))
+            .transformBy(
+                new Transform2d(new Translation2d(cameraToAlgaeNorm, 0), Rotation2d.kZero));
+    Translation2d fieldToAlgaeTranslation2d = fieldToAlgae.getTranslation();
+    AlgaePoseRecord algaePoseRecord =
+        new AlgaePoseRecord(fieldToAlgaeTranslation2d, observation.timestamp());
+
+    algaePoses =
+        algaePoses.stream()
+            .filter(
+                (x) ->
+                    x.translation.getDistance(fieldToAlgaeTranslation2d)
+                        > FieldConstants.algaeDiameter * .8)
+            .collect(Collectors.toSet());
+    algaePoses.add(algaePoseRecord);
+  }
+
+  public Set<Translation2d> getAlgaeTranslations() {
+    return algaePoses.stream()
+        .filter((x) -> Timer.getTimestamp() - x.timestamp() < algaePersistanceTime)
+        .map((x) -> x.translation())
+        .collect(Collectors.toSet());
+  }
+
   public Rotation2d getRotation() {
     return estimatedPose.getRotation();
   }
 
   public void periodicLog() {
+    // Log tx/ty poses
     for (var tag : FieldConstants.defaultAprilTagType.getLayout().getTags()) {
       var pose = getTxTyPose(tag.ID);
       Logger.recordOutput(
           "RobotState/TxTyPoses/" + Integer.toString(tag.ID),
           pose.isPresent() ? new Pose2d[] {pose.get()} : new Pose2d[] {});
     }
+
+    // Log algae poses
+    Logger.recordOutput(
+        "RobotState/AlgaePoses",
+        getAlgaeTranslations().stream()
+            .map(
+                (translation) ->
+                    new Translation3d(
+                        translation.getX(), translation.getY(), FieldConstants.algaeDiameter / 2))
+            .toArray(Translation3d[]::new));
   }
 
   public record OdometryObservation(
@@ -270,4 +340,8 @@ public class RobotState {
       int tagId, int camera, double[] tx, double[] ty, double distance, double timestamp) {}
 
   public record TxTyPoseRecord(Pose2d pose, double distance, double timestamp) {}
+
+  public record AlgaeTxTyObservation(int camera, double[] tx, double[] ty, double timestamp) {}
+
+  public record AlgaePoseRecord(Translation2d translation, double timestamp) {}
 }

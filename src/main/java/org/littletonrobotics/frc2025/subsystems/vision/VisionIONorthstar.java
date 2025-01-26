@@ -31,6 +31,7 @@ public class VisionIONorthstar implements VisionIO {
   private final IntegerSubscriber fpsAprilTagsSubscriber;
   private final IntegerSubscriber fpsObjDetectSubscriber;
   private final IntegerPublisher timestampPublisher;
+  private final BooleanPublisher isRecordingPublisher;
 
   private static final double disconnectedTimeout = 0.5;
   private final Alert disconnectedAlert;
@@ -46,7 +47,8 @@ public class VisionIONorthstar implements VisionIO {
     configTable.getIntegerTopic("camera_exposure").publish().set(cameraExposure);
     configTable.getDoubleTopic("camera_gain").publish().set(cameraGain);
     configTable.getDoubleTopic("fiducial_size_m").publish().set(FieldConstants.aprilTagWidth);
-    configTable.getBooleanTopic("is_recording").publish().set(false);
+    isRecordingPublisher = configTable.getBooleanTopic("is_recording").publish();
+    isRecordingPublisher.set(false);
     timestampPublisher = configTable.getIntegerTopic("timestamp").publish();
     try {
       configTable
@@ -115,5 +117,9 @@ public class VisionIONorthstar implements VisionIO {
       disconnectedTimer.reset();
     }
     disconnectedAlert.set(disconnectedTimer.hasElapsed(disconnectedTimeout));
+  }
+
+  public void setRecording(boolean active) {
+    isRecordingPublisher.set(active);
   }
 }

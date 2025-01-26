@@ -10,7 +10,7 @@ import queue
 import sys
 import threading
 import time
-from typing import List
+from typing import List, Union
 
 import ntcore
 from apriltag_worker import apriltag_worker
@@ -20,6 +20,7 @@ from config.config import ConfigStore, LocalConfig, RemoteConfig
 from config.ConfigSource import ConfigSource, FileConfigSource, NTConfigSource
 from objdetect_worker import objdetect_worker
 from output.OutputPublisher import NTOutputPublisher, OutputPublisher
+from output.StreamServer import MjpegServer, StreamServer
 from output.overlay_util import *
 from output.VideoWriter import FFmpegVideoWriter, VideoWriter
 from pipeline.Capture import CAPTURE_IMPLS
@@ -40,6 +41,7 @@ if __name__ == "__main__":
     output_publisher: OutputPublisher = NTOutputPublisher()
     video_writer: VideoWriter = FFmpegVideoWriter()
     calibration_session = CalibrationSession()
+    calibration_session_server: Union[StreamServer, None] = None
 
     if config.local_config.apriltags_enable:
         apriltag_worker_in = queue.Queue(maxsize=1)
@@ -91,8 +93,12 @@ if __name__ == "__main__":
 
         if calibration_command_source.get_calibrating(config):
             # Calibration mode
+            if not was_calibrating:
+                calibration_session_server = MjpegServer()
+                calibration_session_server.start(7999)
             was_calibrating = True
             calibration_session.process_frame(image, calibration_command_source.get_capture_flag(config))
+            calibration_session_server.set_frame(image)
 
         elif was_calibrating:
             # Finish calibration
