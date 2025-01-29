@@ -194,12 +194,14 @@ public class RobotState {
       return;
     }
 
-    // Get odometry based pose at timestamp
+    // Get rotation at timestamp
     var sample = poseBuffer.getSample(observation.timestamp());
     if (sample.isEmpty()) {
       // exit if not there
       return;
     }
+    Rotation2d robotRotation =
+        estimatedPose.transformBy(new Transform2d(odometryPose, sample.get())).getRotation();
 
     // Average tx's and ty's
     double tx = 0.0;
@@ -212,30 +214,35 @@ public class RobotState {
     ty /= 4.0;
 
     Pose3d cameraPose = Vision.cameraPoses[observation.camera()];
-    // Use 2d distance and tag angle + tx to find robot pose
-    double distance2d = observation.distance() * Math.cos(-cameraPose.getRotation().getY() - ty);
+
+    // Use 3D distance and tag angles to find robot pose
+    Translation2d camToTagTranslation =
+        new Pose3d(Translation3d.kZero, new Rotation3d(0, ty, -tx))
+            .transformBy(
+                new Transform3d(new Translation3d(observation.distance(), 0, 0), Rotation3d.kZero))
+            .getTranslation()
+            .rotateBy(new Rotation3d(0, cameraPose.getRotation().getY(), 0))
+            .toTranslation2d();
     Rotation2d camToTagRotation =
-        sample
-            .get()
-            .getRotation()
-            .plus(cameraPose.toPose2d().getRotation().plus(Rotation2d.fromRadians(-tx)));
+        robotRotation.plus(
+            cameraPose.toPose2d().getRotation().plus(camToTagTranslation.getAngle()));
     var tagPose2d = tagPoses2d.get(observation.tagId());
     if (tagPose2d == null) return;
     Translation2d fieldToCameraTranslation =
         new Pose2d(tagPose2d.getTranslation(), camToTagRotation.plus(Rotation2d.kPi))
-            .transformBy(GeomUtil.toTransform2d(distance2d, 0.0))
+            .transformBy(GeomUtil.toTransform2d(camToTagTranslation.getNorm(), 0.0))
             .getTranslation();
     Pose2d robotPose =
         new Pose2d(
-                fieldToCameraTranslation,
-                sample.get().getRotation().plus(cameraPose.toPose2d().getRotation()))
+                fieldToCameraTranslation, robotRotation.plus(cameraPose.toPose2d().getRotation()))
             .transformBy(new Transform2d(cameraPose.toPose2d(), Pose2d.kZero));
     // Use gyro angle at time for robot rotation
-    robotPose = new Pose2d(robotPose.getTranslation(), sample.get().getRotation());
+    robotPose = new Pose2d(robotPose.getTranslation(), robotRotation);
 
     // Add transform to current odometry based pose for latency correction
     txTyPoses.put(
-        observation.tagId(), new TxTyPoseRecord(robotPose, distance2d, observation.timestamp()));
+        observation.tagId(),
+        new TxTyPoseRecord(robotPose, camToTagTranslation.getNorm(), observation.timestamp()));
   }
 
   /** Get 2d pose estimate of robot if not stale. */
@@ -279,7 +286,8 @@ public class RobotState {
     }
     double cameraToAlgaeNorm =
         (FieldConstants.algaeDiameter / 2 - robotToCamera.getZ())
-            / Math.tan(-robotToCamera.getRotation().getY() - ty);
+            / Math.tan(-robotToCamera.getRotation().getY() - ty)
+            / Math.cos(-tx);
     Pose2d fieldToCamera = fieldToRobot.transformBy(robotToCamera.toPose2d().toTransform2d());
     Pose2d fieldToAlgae =
         fieldToCamera

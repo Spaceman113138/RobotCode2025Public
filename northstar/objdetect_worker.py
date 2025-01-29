@@ -32,7 +32,9 @@ def objdetect_worker(
         config: ConfigStore = sample[2]
 
         observations = object_detector.detect(image, config)
-        [overlay_obj_detect_observation(image, x) for x in observations]
 
         q_out.put((timestamp, observations))
-        stream_server.set_frame(image)
+        if stream_server.get_client_count() > 0:
+            image = image.copy()
+            [overlay_obj_detect_observation(image, x) for x in observations]
+            stream_server.set_frame(image)

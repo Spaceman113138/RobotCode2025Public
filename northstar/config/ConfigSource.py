@@ -34,6 +34,7 @@ class FileConfigSource(ConfigSource):
             config_store.local_config.objdetect_stream_port = config_data["objdetect_stream_port"]
             config_store.local_config.capture_impl = config_data["capture_impl"]
             config_store.local_config.obj_detect_model = config_data["obj_detect_model"]
+            config_store.local_config.obj_detect_max_fps = config_data["obj_detect_max_fps"]
             config_store.local_config.apriltags_enable = config_data["apriltags_enable"]
             config_store.local_config.objdetect_enable = config_data["objdetect_enable"]
             config_store.local_config.video_folder = config_data["video_folder"]

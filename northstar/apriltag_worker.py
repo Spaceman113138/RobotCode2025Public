@@ -48,7 +48,6 @@ def apriltag_worker(
         config: ConfigStore = sample[2]
 
         image_observations = fiducial_detector.detect_fiducials(image, config)
-        [overlay_image_observation(image, x) for x in image_observations]
         camera_pose_observation = camera_pose_estimator.solve_camera_pose(
             [x for x in image_observations if x.tag_id != DEMO_ID], config
         )
@@ -64,4 +63,7 @@ def apriltag_worker(
         q_out.put(
             (timestamp, image_observations, camera_pose_observation, tag_angle_observations, demo_pose_observation)
         )
-        stream_server.set_frame(image)
+        if stream_server.get_client_count() > 0:
+            image = image.copy()
+            [overlay_image_observation(image, x) for x in image_observations]
+            stream_server.set_frame(image)

@@ -68,6 +68,7 @@ if __name__ == "__main__":
 
     apriltags_frame_count = 0
     apriltags_last_print = 0
+    objdetect_next_frame = -1
     objdetect_frame_count = 0
     objdetect_last_print = 0
     was_calibrating = False
@@ -83,13 +84,19 @@ if __name__ == "__main__":
             continue
 
         # Start and stop recording
-        if config.remote_config.is_recording and not was_recording:
+        should_record = (
+            config.remote_config.is_recording
+            and config.remote_config.camera_resolution_width > 0
+            and config.remote_config.camera_resolution_height > 0
+            and config.remote_config.timestamp > 0
+        )
+        if should_record and not was_recording:
             print("Starting recording")
             video_writer.start(config, len(image.shape) == 2)
-        elif not config.remote_config.is_recording and was_recording:
+        elif not should_record and was_recording:
             print("Stopping recording")
             video_writer.stop()
-        was_recording = config.remote_config.is_recording
+        was_recording = should_record
 
         if calibration_command_source.get_calibrating(config):
             # Calibration mode
@@ -109,7 +116,7 @@ if __name__ == "__main__":
             # AprilTag pipeline
             if config.local_config.apriltags_enable:
                 try:
-                    apriltag_worker_in.put((timestamp, image.copy(), config), block=False)
+                    apriltag_worker_in.put((timestamp, image, config), block=False)
                 except:  # No space in queue
                     pass
                 try:
@@ -142,10 +149,15 @@ if __name__ == "__main__":
 
             # Object detection pipeline
             if config.local_config.objdetect_enable:
-                try:
-                    objdetect_worker_in.put((timestamp, image.copy(), config), block=False)
-                except:  # No space in queue
-                    pass
+                # Apply FPS limit for object detection
+                if objdetect_next_frame == -1:
+                    objdetect_next_frame = timestamp
+                if config.local_config.obj_detect_max_fps < 0 or timestamp > objdetect_next_frame:
+                    objdetect_next_frame += 1 / config.local_config.obj_detect_max_fps
+                    try:
+                        objdetect_worker_in.put((timestamp, image, config), block=False)
+                    except:  # No space in queue
+                        pass
                 try:
                     timestamp_out, observations = objdetect_worker_out.get(block=False)
                 except:  # No new frames
@@ -168,9 +180,7 @@ if __name__ == "__main__":
 
             # Save frame to video
             if config.remote_config.is_recording:
-                [overlay_image_observation(image, x) for x in last_image_observations]
-                [overlay_obj_detect_observation(image, x) for x in last_objdetect_observations]
-                video_writer.write_frame(timestamp, image)
+                video_writer.write_frame(timestamp, image, last_image_observations, last_objdetect_observations)
 
         else:
             # No calibration

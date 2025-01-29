@@ -19,6 +19,7 @@ class LocalConfig:
     objdetect_stream_port: int = 8001
     capture_impl: str = ""
     obj_detect_model: str = ""
+    obj_detect_max_fps: int = -1
     apriltags_enable: bool = False
     objdetect_enable: bool = True
     video_folder: str = ""

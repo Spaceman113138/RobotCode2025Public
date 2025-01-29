@@ -5,14 +5,20 @@
 # license that can be found in the LICENSE file at
 # the root directory of this project.
 
+import random
 import socketserver
+import string
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from io import BytesIO
+from typing import Dict
 
 import cv2
 from PIL import Image
+
+
+CLIENT_COUNTS: Dict[str, int] = {}
 
 
 class StreamServer:
@@ -30,8 +36,9 @@ class StreamServer:
 class MjpegServer(StreamServer):
     _frame: cv2.Mat
     _has_frame: bool = False
+    _uuid: str = ""
 
-    def _make_handler(self_mjpeg):  # type: ignore
+    def _make_handler(self_mjpeg, uuid: str):  # type: ignore
         class StreamingHandler(BaseHTTPRequestHandler):
             HTML = """
     <html>
@@ -59,6 +66,7 @@ class MjpegServer(StreamServer):
             """
 
             def do_GET(self):
+                global CLIENT_COUNTS
                 if self.path == "/":
                     content = self.HTML.encode("utf-8")
                     self.send_response(200)
@@ -74,6 +82,7 @@ class MjpegServer(StreamServer):
                     self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=FRAME")
                     self.end_headers()
                     try:
+                        CLIENT_COUNTS[uuid] += 1
                         while True:
                             if not self_mjpeg._has_frame:
                                 time.sleep(0.1)
@@ -91,6 +100,8 @@ class MjpegServer(StreamServer):
                                 self.wfile.write(b"\r\n")
                     except Exception as e:
                         print("Removed streaming client %s: %s", self.client_address, str(e))
+                    finally:
+                        CLIENT_COUNTS[uuid] -= 1
                 else:
                     self.send_error(404)
                     self.end_headers()
@@ -102,12 +113,20 @@ class MjpegServer(StreamServer):
         daemon_threads = True
 
     def _run(self, port: int) -> None:
-        server = self.StreamingServer(("", port), self._make_handler())
+        self._uuid = "".join(random.choice(string.ascii_lowercase) for i in range(12))
+        CLIENT_COUNTS[self._uuid] = 0
+        server = self.StreamingServer(("", port), self._make_handler(self._uuid))
         server.serve_forever()
 
     def start(self, port: int) -> None:
         threading.Thread(target=self._run, daemon=True, args=(port,)).start()
 
     def set_frame(self, frame: cv2.Mat) -> None:
-        self._frame = frame.copy()
+        self._frame = frame
         self._has_frame = True
+
+    def get_client_count(self) -> int:
+        if len(self._uuid) > 0:
+            return CLIENT_COUNTS[self._uuid]
+        else:
+            return 0

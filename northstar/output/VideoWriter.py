@@ -5,6 +5,7 @@
 # license that can be found in the LICENSE file at
 # the root directory of this project.
 
+from typing import List
 import cv2
 from datetime import datetime
 import subprocess
@@ -12,6 +13,8 @@ import queue
 import threading
 
 from config.config import ConfigStore
+from output.overlay_util import overlay_image_observation, overlay_obj_detect_observation
+from vision_types import FiducialImageObservation, ObjDetectObservation
 
 FRAMERATE = 25
 
@@ -82,13 +85,22 @@ class FFmpegVideoWriter(VideoWriter):
         self._thread.join()
         self._ffmpeg.kill()
 
-    def write_frame(self, timestamp: float, frame: cv2.Mat) -> None:
+    def write_frame(
+        self,
+        timestamp: float,
+        frame: cv2.Mat,
+        image_observations: List[FiducialImageObservation],
+        obj_detect_observations: List[ObjDetectObservation],
+    ) -> None:
         try:
-            self._queue.put(frame, block=False)
+            self._queue.put((frame, image_observations, obj_detect_observations), block=False)
         except:
             pass
 
     def _frame_thread(self, q_in: queue.Queue[cv2.Mat]) -> None:
         while self._running:
-            frame = q_in.get()
+            frame, image_observations, obj_detect_observations = q_in.get()
+            frame = frame.copy()
+            [overlay_image_observation(frame, x) for x in image_observations]
+            [overlay_obj_detect_observation(frame, x) for x in obj_detect_observations]
             self._ffmpeg.stdin.write(frame.tobytes())
