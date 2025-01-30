@@ -15,18 +15,29 @@ import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
+import java.util.Random;
+import java.util.Set;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
-import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
+import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
+import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
+import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.*;
+import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
+import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIO;
+import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOSim;
+import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOTalonFX;
+import org.littletonrobotics.frc2025.subsystems.superstructure.slam.*;
 import org.littletonrobotics.frc2025.subsystems.vision.Vision;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
+import org.littletonrobotics.frc2025.util.Container;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
+import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class RobotContainer {
@@ -36,7 +47,7 @@ public class RobotContainer {
   // Subsystems
   private Drive drive;
   private Vision vision;
-  private RollerSystem roller;
+  private final Superstructure superstructure;
 
   // Controller
   private final CommandXboxController controller = new CommandXboxController(0);
@@ -46,6 +57,9 @@ public class RobotContainer {
 
   /** The container for the robot. Contains subsystems, OI devices, and commands. */
   public RobotContainer() {
+    Elevator elevator = null;
+    Dispenser dispenser = null;
+    Slam slam = null;
     if (Constants.getMode() != Constants.Mode.REPLAY) {
       switch (Constants.getRobot()) {
         case COMPBOT -> {
@@ -62,8 +76,15 @@ public class RobotContainer {
                   new VisionIONorthstar(1),
                   new VisionIONorthstar(2),
                   new VisionIONorthstar(3));
-          roller =
-              new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
+          elevator = new Elevator(new ElevatorIOTalonFX());
+          dispenser =
+              new Dispenser(
+                  new DispenserIOTalonFX(),
+                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
+                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
+          slam =
+              new Slam(
+                  new SlamIOTalonFX(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
         }
         case DEVBOT -> {
           drive =
@@ -74,8 +95,14 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
           vision = new Vision(new VisionIONorthstar(0));
-          roller =
-              new RollerSystem("Roller", new RollerSystemIOTalonFX(0, "*", 0, false, false, 0));
+          elevator = new Elevator(new ElevatorIOTalonFX());
+          dispenser =
+              new Dispenser(
+                  new DispenserIOSim(),
+                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
+                  new RollerSystemIOSim(DCMotor.getKrakenX60(1), 1.0, 0.2));
+          slam =
+              new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
         }
         case SIMBOT -> {
           drive =
@@ -85,8 +112,15 @@ public class RobotContainer {
                   new ModuleIOSim(),
                   new ModuleIOSim(),
                   new ModuleIOSim());
-          roller =
-              new RollerSystem("Roller", new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 4, .1));
+          elevator = new Elevator(new ElevatorIOSim());
+          dispenser =
+              new Dispenser(
+                  new DispenserIOSim(),
+                  new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2),
+                  new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2));
+          slam =
+              new Slam(
+                  new SlamIOSim(), new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
         }
       }
     }
@@ -101,10 +135,6 @@ public class RobotContainer {
               new ModuleIO() {},
               new ModuleIO() {});
     }
-    if (roller == null) {
-      roller = new RollerSystem("Roller", new RollerSystemIO() {});
-    }
-
     if (vision == null) {
       switch (Constants.getRobot()) {
         case COMPBOT ->
@@ -112,8 +142,20 @@ public class RobotContainer {
                 new Vision(
                     new VisionIO() {}, new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
         case DEVBOT -> vision = new Vision(new VisionIO() {});
+        default -> vision = new Vision();
       }
     }
+    if (elevator == null) {
+      elevator = new Elevator(new ElevatorIO() {});
+    }
+    if (dispenser == null) {
+      dispenser =
+          new Dispenser(new DispenserIO() {}, new RollerSystemIO() {}, new RollerSystemIO() {});
+    }
+    if (slam == null) {
+      slam = new Slam(new SlamIO() {}, new RollerSystemIO() {});
+    }
+    superstructure = new Superstructure(elevator, dispenser, slam);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices");
@@ -131,6 +173,8 @@ public class RobotContainer {
                     RobotState.getInstance()
                         .resetPose(AllianceFlipUtil.apply(testTrajectory.getStartPose())))
             .andThen(new DriveTrajectory(drive, testTrajectory)));
+    autoChooser.addOption("Elevator static", elevator.staticCharacterization(2.0));
+    autoChooser.addOption("Pivot static", dispenser.staticCharacterization(2.0));
 
     // Configure the button bindings
     configureButtonBindings();
@@ -151,19 +195,6 @@ public class RobotContainer {
             () -> -controller.getLeftX(),
             () -> -controller.getRightX()));
 
-    // Lock to 0° when A button is held
-    controller
-        .a()
-        .whileTrue(
-            DriveCommands.joystickDriveAtAngle(
-                drive,
-                () -> -controller.getLeftY(),
-                () -> -controller.getLeftX(),
-                () -> Rotation2d.kZero));
-
-    // Switch to X pattern when X button is pressed
-    controller.x().onTrue(Commands.runOnce(drive::stopWithX, drive));
-
     // Reset gyro to 0° when B button is pressed
     controller
         .b()
@@ -177,6 +208,27 @@ public class RobotContainer {
                                     AllianceFlipUtil.apply(new Rotation2d()))),
                     drive)
                 .ignoringDisable(true));
+
+    // Test command for superstructure
+    var random = new Random();
+    Container<Integer> randomInt = new Container<>();
+    randomInt.value = 1;
+    controller
+        .x()
+        .onTrue(
+            Commands.runOnce(
+                () -> randomInt.value = random.nextInt(SuperstructureState.State.values().length)));
+    controller
+        .a()
+        .whileTrue(
+            Commands.defer(
+                () -> {
+                  Logger.recordOutput(
+                      "RandomState", SuperstructureState.State.values()[randomInt.value]);
+                  return superstructure.runGoal(
+                      SuperstructureState.State.values()[randomInt.value].getValue());
+                },
+                Set.of(superstructure)));
   }
 
   /**

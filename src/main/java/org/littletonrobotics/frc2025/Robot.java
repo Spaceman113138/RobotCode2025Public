@@ -7,6 +7,7 @@
 
 package org.littletonrobotics.frc2025;
 
+import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Threads;
 import edu.wpi.first.wpilibj2.command.Command;
@@ -91,7 +92,7 @@ public class Robot extends LoggedRobot {
     // Configure brownout voltage
     RobotController.setBrownoutVoltage(6.0);
 
-    // Create RobotConatiner
+    // Create RobotContainer
     robotContainer = new RobotContainer();
   }
 

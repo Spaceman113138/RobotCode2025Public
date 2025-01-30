@@ -13,10 +13,12 @@ import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusSignal;
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
 import com.ctre.phoenix6.controls.NeutralOut;
+import com.ctre.phoenix6.controls.TorqueCurrentFOC;
 import com.ctre.phoenix6.controls.VoltageOut;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.Angle;
 import edu.wpi.first.units.measure.AngularVelocity;
@@ -36,10 +38,13 @@ public class RollerSystemIOTalonFX implements RollerSystemIO {
   private final StatusSignal<Temperature> tempCelsius;
 
   // Single shot for voltage mode, robot loop will call continuously
-  private final VoltageOut voltageOut = new VoltageOut(0.0).withEnableFOC(true).withUpdateFreqHz(0);
+  private final TorqueCurrentFOC torqueCurrentFOC = new TorqueCurrentFOC(0.0).withUpdateFreqHz(0.0);
+  private final VoltageOut voltageOut = new VoltageOut(0.0).withUpdateFreqHz(0);
   private final NeutralOut neutralOut = new NeutralOut();
 
   private final double reduction;
+
+  private final Debouncer connectedDebouncer = new Debouncer(0.5);
 
   public RollerSystemIOTalonFX(
       int id, String bus, int currentLimitAmps, boolean invert, boolean brake, double reduction) {
@@ -78,15 +83,21 @@ public class RollerSystemIOTalonFX implements RollerSystemIO {
   @Override
   public void updateInputs(RollerSystemIOInputs inputs) {
     inputs.connected =
-        BaseStatusSignal.refreshAll(
-                position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, tempCelsius)
-            .isOK();
+        connectedDebouncer.calculate(
+            BaseStatusSignal.refreshAll(
+                    position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, tempCelsius)
+                .isOK());
     inputs.positionRads = Units.rotationsToRadians(position.getValueAsDouble()) / reduction;
     inputs.velocityRadsPerSec = Units.rotationsToRadians(velocity.getValueAsDouble()) / reduction;
     inputs.appliedVoltage = appliedVoltage.getValueAsDouble();
     inputs.supplyCurrentAmps = supplyCurrent.getValueAsDouble();
     inputs.torqueCurrentAmps = torqueCurrent.getValueAsDouble();
     inputs.tempCelsius = tempCelsius.getValueAsDouble();
+  }
+
+  @Override
+  public void runTorqueCurrent(double current) {
+    talon.setControl(torqueCurrentFOC.withOutput(current));
   }
 
   @Override
@@ -97,5 +108,17 @@ public class RollerSystemIOTalonFX implements RollerSystemIO {
   @Override
   public void stop() {
     talon.setControl(neutralOut);
+  }
+
+  @Override
+  public void setBrakeMode(boolean enabled) {
+    new Thread(
+            () ->
+                tryUntilOk(
+                    5,
+                    () ->
+                        talon.setNeutralMode(
+                            enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast)))
+        .start();
   }
 }

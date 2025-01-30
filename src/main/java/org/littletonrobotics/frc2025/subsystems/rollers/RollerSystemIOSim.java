@@ -16,13 +16,11 @@ import org.littletonrobotics.frc2025.Constants;
 
 public class RollerSystemIOSim implements RollerSystemIO {
   private final DCMotorSim sim;
+  private final DCMotor gearbox;
   private double appliedVoltage = 0.0;
 
-  private static final DCMotor motorModel = DCMotor.getKrakenX60Foc(1);
-  private static final double reduction = (18.0 / 12.0);
-  private static final double moi = 0.001;
-
   public RollerSystemIOSim(DCMotor motorModel, double reduction, double moi) {
+    gearbox = motorModel;
     sim =
         new DCMotorSim(LinearSystemId.createDCMotorSystem(motorModel, moi, reduction), motorModel);
   }
@@ -39,6 +37,13 @@ public class RollerSystemIOSim implements RollerSystemIO {
     inputs.velocityRadsPerSec = sim.getAngularVelocityRadPerSec();
     inputs.appliedVoltage = appliedVoltage;
     inputs.supplyCurrentAmps = sim.getCurrentDrawAmps();
+    inputs.torqueCurrentAmps =
+        gearbox.getCurrent(sim.getAngularVelocityRadPerSec(), appliedVoltage);
+  }
+
+  @Override
+  public void runTorqueCurrent(double current) {
+    runVolts(gearbox.getVoltage(gearbox.getTorque(current), sim.getAngularVelocityRadPerSec()));
   }
 
   @Override
