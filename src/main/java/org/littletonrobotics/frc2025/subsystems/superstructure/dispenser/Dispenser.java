@@ -9,6 +9,7 @@ package org.littletonrobotics.frc2025.subsystems.superstructure.dispenser;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
+import edu.wpi.first.math.filter.Debouncer.DebounceType;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.trajectory.ExponentialProfile;
 import edu.wpi.first.math.trajectory.ExponentialProfile.State;
@@ -57,6 +58,8 @@ public class Dispenser {
       new LoggedTunableNumber("Dispenser/TunnelDispenseVolts", 6.0);
   public static final LoggedTunableNumber tunnelIntakeVolts =
       new LoggedTunableNumber("Dispenser/TunnelIntakeVolts", -6.0);
+  public static final LoggedTunableNumber tolerance =
+      new LoggedTunableNumber("Dispenser/Tolerance", .1);
 
   // Hardware
   private final DispenserIO pivotIO;
@@ -68,7 +71,7 @@ public class Dispenser {
 
   // Overrides
   private BooleanSupplier coastOverride = () -> false;
-  private BooleanSupplier disabledOverride = DriverStation::isDisabled;
+  private BooleanSupplier disabledOverride = () -> false;
 
   @AutoLogOutput(key = "Dispenser/PivotBrakeModeEnabled")
   private boolean brakeModeEnabled = true;
@@ -82,6 +85,8 @@ public class Dispenser {
   @Getter private State setpoint = new State();
   private DoubleSupplier goal = () -> 0.0;
   private boolean stopProfile = false;
+  @Getter private boolean shouldEStop = false;
+  @Setter private boolean isEStopped = false;
 
   @Getter
   @AutoLogOutput(key = "Dispenser/Profile/AtGoal")
@@ -94,6 +99,7 @@ public class Dispenser {
   private boolean hasAlgae = false;
 
   private Debouncer algaeDebouncer = new Debouncer(0.1);
+  private Debouncer toleranceDebouncer = new Debouncer(.5, DebounceType.kRising);
 
   // Disconnected alerts
   private final Alert pivotMotorDisconnectedAlert =
@@ -145,9 +151,21 @@ public class Dispenser {
     // Calculate combined angle
     finalAngle = calculateFinalAngle(pivotInputs.internalPosition);
 
+    // Check if out of tolerance
+    boolean outOfTolerance =
+        Math.abs(finalAngle.getRadians() - setpoint.position) > tolerance.get();
+    shouldEStop =
+        toleranceDebouncer.calculate(outOfTolerance)
+            || finalAngle.getRadians() < minAngleRad
+            || finalAngle.getRadians() > maxAngleRad;
+
     // Run profile
     final boolean shouldRunProfile =
-        !stopProfile && !coastOverride.getAsBoolean() && !disabledOverride.getAsBoolean();
+        !stopProfile
+            && !coastOverride.getAsBoolean()
+            && !disabledOverride.getAsBoolean()
+            && !isEStopped
+            && DriverStation.isEnabled();
     Logger.recordOutput("Dispenser/RunningProfile", shouldRunProfile);
     if (shouldRunProfile) {
       // Clamp goal
@@ -176,8 +194,14 @@ public class Dispenser {
     }
 
     // Run tunnel and gripper
-    tunnelIO.runVolts(tunnelVolts);
-    gripperIO.runTorqueCurrent(gripperCurrent);
+    if (!isEStopped) {
+      tunnelIO.runVolts(tunnelVolts);
+      gripperIO.runTorqueCurrent(gripperCurrent);
+    } else {
+      pivotIO.stop();
+      tunnelIO.stop();
+      gripperIO.stop();
+    }
 
     // Check algae
     if (Constants.getRobot() != Constants.RobotType.SIMBOT) {
@@ -210,8 +234,7 @@ public class Dispenser {
 
   public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
     this.coastOverride = coastOverride;
-    this.disabledOverride =
-        () -> this.disabledOverride.getAsBoolean() && disabledOverride.getAsBoolean();
+    this.disabledOverride = disabledOverride;
   }
 
   private void setBrakeMode(boolean enabled) {

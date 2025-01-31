@@ -75,44 +75,44 @@ public class DriveConstants {
   public static final ModuleConfig[] moduleConfigsDev = {
     // FL
     ModuleConfig.builder()
-        .driveMotorId(16)
-        .turnMotorId(12)
+        .driveMotorId(12)
+        .turnMotorId(9)
         .encoderChannel(0)
-        .encoderOffset(Rotation2d.fromRadians(0.81761))
+        .encoderOffset(Rotation2d.fromRadians(-1.144))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // FR
     ModuleConfig.builder()
-        .driveMotorId(19)
-        .turnMotorId(14)
+        .driveMotorId(2)
+        .turnMotorId(10)
         .encoderChannel(1)
-        .encoderOffset(Rotation2d.fromRadians(-1.80875))
+        .encoderOffset(Rotation2d.fromRadians(0.101))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // BL
     ModuleConfig.builder()
-        .driveMotorId(17)
-        .turnMotorId(13)
+        .driveMotorId(15)
+        .turnMotorId(11)
         .encoderChannel(2)
-        .encoderOffset(Rotation2d.fromRadians(0.48936))
+        .encoderOffset(Rotation2d.fromRadians(-2.558))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // BR
     ModuleConfig.builder()
-        .driveMotorId(18)
-        .turnMotorId(15)
+        .driveMotorId(3)
+        .turnMotorId(8)
         .encoderChannel(3)
-        .encoderOffset(Rotation2d.fromRadians(1.52578))
+        .encoderOffset(Rotation2d.fromRadians(0.844))
         .turnInverted(true)
         .encoderInverted(false)
         .build()
   };
 
   public static class PigeonConstants {
-    public static final int id = 0;
+    public static final int id = 3;
   }
 
   @Builder

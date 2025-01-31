@@ -49,7 +49,7 @@ public class ModuleIODev implements ModuleIO {
   private final TalonFXConfiguration driveConfig = new TalonFXConfiguration();
   private final TalonFXConfiguration turnConfig = new TalonFXConfiguration();
   private final Rotation2d encoderOffset;
-  private static final Executor brakeModeExecutor = Executors.newFixedThreadPool(4);
+  private static final Executor brakeModeExecutor = Executors.newFixedThreadPool(8);
 
   // Control requests
   private final TorqueCurrentFOC torqueCurrentRequest = new TorqueCurrentFOC(0).withUpdateFreqHz(0);
@@ -235,6 +235,14 @@ public class ModuleIODev implements ModuleIO {
             driveConfig.MotorOutput.NeutralMode =
                 enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
             tryUntilOk(5, () -> driveTalon.getConfigurator().apply(driveConfig, 0.25));
+          }
+        });
+    brakeModeExecutor.execute(
+        () -> {
+          synchronized (turnConfig) {
+            turnConfig.MotorOutput.NeutralMode =
+                enabled ? NeutralModeValue.Brake : NeutralModeValue.Coast;
+            tryUntilOk(5, () -> turnTalon.getConfigurator().apply(turnConfig, 0.25));
           }
         });
   }

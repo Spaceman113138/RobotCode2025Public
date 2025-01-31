@@ -94,15 +94,6 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
-          vision = new Vision(new VisionIONorthstar(0));
-          elevator = new Elevator(new ElevatorIOTalonFX());
-          dispenser =
-              new Dispenser(
-                  new DispenserIOSim(),
-                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
-                  new RollerSystemIOSim(DCMotor.getKrakenX60(1), 1.0, 0.2));
-          slam =
-              new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
         }
         case SIMBOT -> {
           drive =

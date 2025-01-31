@@ -9,6 +9,7 @@ package org.littletonrobotics.frc2025.subsystems.superstructure.elevator;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
+import edu.wpi.first.math.filter.Debouncer.DebounceType;
 import edu.wpi.first.math.trajectory.ExponentialProfile;
 import edu.wpi.first.math.trajectory.ExponentialProfile.Constraints;
 import edu.wpi.first.math.trajectory.ExponentialProfile.State;
@@ -23,6 +24,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Getter;
+import lombok.Setter;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
@@ -48,6 +50,8 @@ public class Elevator {
       new LoggedTunableNumber("Elevator/HomingCurrentLimitAmps", 0.05);
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Elevator/StaticCharacterizationVelocityThresh", 0.1);
+  private static final LoggedTunableNumber tolerance =
+      new LoggedTunableNumber("Elevator/Tolerance", .1);
 
   private final ElevatorIO io;
   private final ElevatorIOInputsAutoLogged inputs = new ElevatorIOInputsAutoLogged();
@@ -55,7 +59,7 @@ public class Elevator {
   private final Alert motorDisconnectedAlert =
       new Alert("Elevator motor disconnected!", Alert.AlertType.kWarning);
   private BooleanSupplier coastOverride = () -> false;
-  private BooleanSupplier disabledOverride = DriverStation::isDisabled;
+  private BooleanSupplier disabledOverride = () -> false;
 
   @AutoLogOutput(key = "Elevator/BrakeModeEnabled")
   private boolean brakeModeEnabled = true;
@@ -64,6 +68,8 @@ public class Elevator {
   @Getter private State setpoint = new State();
   private Supplier<State> goal = State::new;
   private boolean stopProfile = false;
+  @Getter private boolean shouldEStop = false;
+  @Setter private boolean isEStopped = false;
 
   @AutoLogOutput(key = "Elevator/HomedPositionRad")
   private double homedPosition = 0.0;
@@ -73,6 +79,8 @@ public class Elevator {
   private boolean homed = false;
 
   private Debouncer homingDebouncer = new Debouncer(homingTimeSecs.get());
+
+  private Debouncer toleranceDebouncer = new Debouncer(.5, DebounceType.kRising);
 
   @Getter
   @AutoLogOutput(key = "Elevator/Profile/AtGoal")
@@ -101,8 +109,17 @@ public class Elevator {
     // Set coast mode
     setBrakeMode(!coastOverride.getAsBoolean());
 
+    // Check if out of tolerance
+    boolean outOfTolerance = Math.abs(getPositionMeters() - setpoint.position) > tolerance.get();
+    shouldEStop = toleranceDebouncer.calculate(outOfTolerance);
+
     final boolean shouldRunProfile =
-        !stopProfile && !coastOverride.getAsBoolean() && !disabledOverride.getAsBoolean() && homed;
+        !stopProfile
+            && !coastOverride.getAsBoolean()
+            && !disabledOverride.getAsBoolean()
+            && homed
+            && !isEStopped
+            && DriverStation.isEnabled();
     Logger.recordOutput("Elevator/RunningProfile", shouldRunProfile);
     // Run profile
     if (shouldRunProfile) {
@@ -134,6 +151,9 @@ public class Elevator {
       Logger.recordOutput("Elevator/Profile/GoalPositionMeters", 0.0);
       Logger.recordOutput("Elevator/Profile/GoalVelocityMetersPerSec", 0.0);
     }
+    if (isEStopped) {
+      io.stop();
+    }
 
     // Log state
     Logger.recordOutput("Elevator/CoastOverride", coastOverride.getAsBoolean());
@@ -153,8 +173,7 @@ public class Elevator {
 
   public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
     this.coastOverride = coastOverride;
-    this.disabledOverride =
-        () -> this.disabledOverride.getAsBoolean() && disabledOverride.getAsBoolean();
+    this.disabledOverride = disabledOverride;
   }
 
   private void setBrakeMode(boolean enabled) {

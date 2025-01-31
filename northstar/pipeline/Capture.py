@@ -151,6 +151,7 @@ class PylonCapture(Capture):
         self._mode = mode
 
     _camera: Union[None, pylon.InstantCamera] = None
+    _converter: Union[None, pylon.ImageFormatConverter] = None
     _last_config: ConfigStore
 
     def get_frame(self, config_store: ConfigStore) -> Tuple[bool, cv2.Mat]:
@@ -179,9 +180,9 @@ class PylonCapture(Capture):
                 self._camera.GetNodeMap().GetNode("Gain").SetValue(config_store.remote_config.camera_gain)
 
                 if self._mode == "color":
-                    self._camera.GetNodeMap().GetNode("BinningHorizontal").SetValue(2)
-                    self._camera.GetNodeMap().GetNode("BinningVertical").SetValue(2)
-                    self._camera.GetNodeMap().GetNode("PixelFormat").SetValue("RGB8")
+                    self._converter = pylon.ImageFormatConverter()
+                    self._converter.OutputPixelFormat = pylon.PixelType_RGB8packed
+                    self._converter.OutputBitAlignment = pylon.OutputBitAlignment_MsbAligned
 
                 elif self._mode == "cropped":
                     self._camera.GetNodeMap().GetNode("Width").SetValue(1600)
@@ -202,7 +203,10 @@ class PylonCapture(Capture):
             with self._camera.RetrieveResult(5000, pylon.TimeoutHandling_ThrowException) as grab_result:
                 if grab_result.GrabSucceeded:
                     try:
-                        return True, grab_result.Array
+                        if self._converter == None:
+                            return True, grab_result.Array
+                        else: 
+                            return True, self._converter.Convert(grab_result).Array
                     except Exception:
                         print("Error when capturing frame:", traceback.format_exc())
                         return False, None

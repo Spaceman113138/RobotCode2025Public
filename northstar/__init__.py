@@ -10,7 +10,7 @@ import queue
 import sys
 import threading
 import time
-from typing import List, Union
+from typing import List, Tuple, Union
 
 import ntcore
 from apriltag_worker import apriltag_worker
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     was_recording = False
     last_image_observations: List[FiducialImageObservation] = []
     last_objdetect_observations: List[ObjDetectObservation] = []
+    video_frame_cache: List[cv2.Mat] = []
     while True:
         remote_config_source.update(config)
         timestamp = time.time()
@@ -180,7 +181,13 @@ if __name__ == "__main__":
 
             # Save frame to video
             if config.remote_config.is_recording:
-                video_writer.write_frame(timestamp, image, last_image_observations, last_objdetect_observations)
+                if len(video_frame_cache) >= 2:
+                    # Delay output by two frames to improve alignment with overlays
+                    video_writer.write_frame(timestamp, video_frame_cache.pop(
+                        0), last_image_observations, last_objdetect_observations)
+                video_frame_cache.append(image)
+            else:
+                video_frame_cache = []
 
         else:
             # No calibration

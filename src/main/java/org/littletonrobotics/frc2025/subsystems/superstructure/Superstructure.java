@@ -10,9 +10,12 @@ package org.littletonrobotics.frc2025.subsystems.superstructure;
 import edu.wpi.first.math.Pair;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.wpilibj2.command.*;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.*;
+import java.util.function.BooleanSupplier;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.Setter;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
@@ -21,6 +24,7 @@ import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispens
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam.Goal;
+import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Superstructure extends SubsystemBase {
@@ -37,6 +41,11 @@ public class Superstructure extends SubsystemBase {
   private SuperstructureState next = null;
   private SuperstructureState goal = State.START.getValue();
 
+  @AutoLogOutput(key = "Superstructure/EStopped")
+  private boolean isEStopped = false;
+
+  @Setter private BooleanSupplier disabledOverride = () -> false;
+
   private final SuperstructureVisualizer measuredVisualizer =
       new SuperstructureVisualizer("Measured");
   private final SuperstructureVisualizer setpointVisualizer =
@@ -47,6 +56,10 @@ public class Superstructure extends SubsystemBase {
     this.elevator = elevator;
     this.dispenser = dispenser;
     this.slam = slam;
+
+    // Updating E Stop based on disabled override
+    new Trigger(() -> disabledOverride.getAsBoolean())
+        .onFalse(Commands.runOnce(() -> isEStopped = false).ignoringDisable(true));
 
     // Add states as vertices
     for (var state : State.values()) {
@@ -257,6 +270,11 @@ public class Superstructure extends SubsystemBase {
                 });
       }
     }
+
+    // E Stop Dispenser and Elevator if Necessary
+    isEStopped = isEStopped || elevator.isShouldEStop() || dispenser.isShouldEStop();
+    elevator.setEStopped(isEStopped);
+    dispenser.setEStopped(isEStopped);
 
     // Log state
     Logger.recordOutput(
