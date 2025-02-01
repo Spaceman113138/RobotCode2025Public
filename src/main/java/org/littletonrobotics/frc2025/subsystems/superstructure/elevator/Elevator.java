@@ -239,9 +239,11 @@ public class Elevator {
     return goal.get().position;
   }
 
-  @AutoLogOutput(key = "Elevator/AvgCurrent")
+  @AutoLogOutput
   private double getCurrent() {
-    return Arrays.stream(inputs.currentAmps).average().getAsDouble();
+    return inputs.currentAmps.length == 0
+        ? 0.0
+        : Arrays.stream(inputs.currentAmps).average().getAsDouble();
   }
 
   private static Constraints fromMaxTorque(double maxTorque) {
