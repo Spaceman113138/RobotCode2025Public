@@ -53,11 +53,8 @@ public class Drive extends SubsystemBase {
   private final SwerveDriveKinematics kinematics =
       new SwerveDriveKinematics(DriveConstants.moduleTranslations);
 
-  @AutoLogOutput(key = "Drive/VelocityMode")
-  private boolean velocityMode = false;
-
-  @AutoLogOutput(key = "Drive/BrakeModeEnabled")
-  private boolean brakeModeEnabled = true;
+  @AutoLogOutput private boolean velocityMode = false;
+  @AutoLogOutput private boolean brakeModeEnabled = true;
 
   private SwerveSetpoint currentSetpoint =
       new SwerveSetpoint(
@@ -144,6 +141,8 @@ public class Drive extends SubsystemBase {
                       gyroInputs.connected ? gyroInputs.odometryYawPositions[i] : null),
                   sampleTimestamps[i]));
     }
+
+    RobotState.getInstance().addDriveSpeeds(getChassisSpeeds());
 
     // Update brake mode
     // Reset movement timer if velocity above threshold

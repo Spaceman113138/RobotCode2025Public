@@ -70,7 +70,7 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
         (ReefHeight.L3.height + Units.inchesToMeters(5.5) - groundToCarriageZero)
             - (pivotToGripper / 2.0 * Rotation2d.fromDegrees(algaeIntakeAngle).getSin()),
         algaeIntakeAngle),
-    THROW(() -> elevatorHeightMeters, () -> 40.0),
+    THROW(() -> elevatorHeightMeters, () -> pivotSafeAngle.getDegrees()),
     PRE_PROCESSOR("Processing", 0.05, -80.0),
     ALGAE_STOW("AlgaeStow", 0.0, 25.0),
     ALGAE_STOW_FRONT("AlgaeStowFront", 0.1, pivotSafeAngle.getDegrees()),

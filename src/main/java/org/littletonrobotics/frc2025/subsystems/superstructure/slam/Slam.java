@@ -9,6 +9,7 @@ package org.littletonrobotics.frc2025.subsystems.superstructure.slam;
 
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.wpilibj.DriverStation;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import lombok.Getter;
@@ -26,13 +27,15 @@ public class Slam {
   private static final LoggedTunableNumber slammedTimeSecs =
       new LoggedTunableNumber("Slam/SlammedTimeSecs", 0.3);
   private static final LoggedTunableNumber slamDownCurrent =
-      new LoggedTunableNumber("Slam/SlamDownCurrent", -30.0);
+      new LoggedTunableNumber("Slam/SlamDownCurrent", -40.0);
   private static final LoggedTunableNumber slamUpCurrent =
-      new LoggedTunableNumber("Slam/SlamUpCurrent", 30.0);
+      new LoggedTunableNumber("Slam/SlamUpCurrent", 40.0);
   public static final LoggedTunableNumber occupiedVolts =
       new LoggedTunableNumber("Slam/OccupiedVolts", 5.0);
   public static final LoggedTunableNumber processorVolts =
       new LoggedTunableNumber("Slam/ProcessorVolts", -5.0);
+  public static final LoggedTunableNumber floorIntakeVolts =
+      new LoggedTunableNumber("Slam/FloorIntakeVolts", 8.0);
 
   public static final Rotation2d maxAngle = Rotation2d.fromDegrees(90.0);
   public static final Rotation2d minAngle = Rotation2d.fromDegrees(40.0);
@@ -53,22 +56,11 @@ public class Slam {
   private final RollerSystemIO rollerIO;
   private final RollerSystemIOInputsAutoLogged rollerInputs = new RollerSystemIOInputsAutoLogged();
 
-  @Setter
-  @Getter
-  @AutoLogOutput(key = "Slam/Goal")
-  private Goal goal = Goal.SLAM_UP;
-
+  @Setter @Getter @AutoLogOutput private Goal goal = Goal.SLAM_UP;
   @Setter private double intakeVolts = 0.0;
-
   private Goal lastGoal = null;
-
-  @Getter
-  @AutoLogOutput(key = "Slam/Retracting")
-  private boolean retracting = false;
-
-  @Getter
-  @AutoLogOutput(key = "Slam/Slammed")
-  private boolean slammed = false;
+  @Getter @AutoLogOutput private boolean retracting = false;
+  @Getter @AutoLogOutput private boolean slammed = false;
 
   private Debouncer slamDebouncer = new Debouncer(0.0);
 
@@ -105,6 +97,12 @@ public class Slam {
       } else {
         slamIO.stop();
       }
+    }
+
+    // Reset when disabled
+    if (DriverStation.isDisabled()) {
+      slammed = false;
+      slamDebouncer.calculate(false);
     }
 
     rollerIO.runVolts(intakeVolts);

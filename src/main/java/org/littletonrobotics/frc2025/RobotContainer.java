@@ -10,13 +10,14 @@ package org.littletonrobotics.frc2025;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
-import java.util.Random;
-import java.util.Set;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
+import edu.wpi.first.wpilibj2.command.button.Trigger;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
@@ -35,9 +36,8 @@ import org.littletonrobotics.frc2025.subsystems.vision.Vision;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
-import org.littletonrobotics.frc2025.util.Container;
+import org.littletonrobotics.frc2025.util.OverrideSwitches;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
-import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class RobotContainer {
@@ -50,7 +50,13 @@ public class RobotContainer {
   private final Superstructure superstructure;
 
   // Controller
-  private final CommandXboxController controller = new CommandXboxController(0);
+  private final CommandXboxController driver = new CommandXboxController(0);
+  private final CommandXboxController operator = new CommandXboxController(1);
+  private final OverrideSwitches overrides = new OverrideSwitches(5);
+  private final Trigger elevatorDisable = overrides.driverSwitch(1);
+  private final Trigger elevatorCoast = overrides.driverSwitch(2);
+
+  private boolean elevatorCoastOverride = false;
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -94,6 +100,9 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
+          elevator = new Elevator(new ElevatorIOTalonFX());
+          slam =
+              new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false, 1.0));
         }
         case SIMBOT -> {
           drive =
@@ -167,6 +176,12 @@ public class RobotContainer {
     autoChooser.addOption("Elevator static", elevator.staticCharacterization(2.0));
     autoChooser.addOption("Pivot static", dispenser.staticCharacterization(2.0));
 
+    // Set up overrides
+    superstructure.setDisabledOverride(elevatorDisable);
+    elevator.setOverrides(() -> elevatorCoastOverride, elevatorDisable);
+    dispenser.setOverrides(() -> elevatorCoastOverride, elevatorDisable);
+    slam.setCoastOverride(() -> elevatorCoastOverride);
+
     // Configure the button bindings
     configureButtonBindings();
   }
@@ -178,16 +193,30 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
+    elevatorCoast
+        .onTrue(
+            Commands.runOnce(
+                    () -> {
+                      if (DriverStation.isDisabled()) {
+                        elevatorCoastOverride = true;
+                      }
+                    })
+                .ignoringDisable(true))
+        .onFalse(Commands.runOnce(() -> elevatorCoastOverride = false).ignoringDisable(true));
+
+    RobotModeTriggers.disabled()
+        .onFalse(Commands.runOnce(() -> elevatorCoastOverride = false).ignoringDisable(true));
+
     // Default command, normal field-relative drive
     drive.setDefaultCommand(
         DriveCommands.joystickDrive(
             drive,
-            () -> -controller.getLeftY(),
-            () -> -controller.getLeftX(),
-            () -> -controller.getRightX()));
+            () -> -driver.getLeftY() - operator.getLeftY(),
+            () -> -driver.getLeftX() - operator.getLeftX(),
+            () -> -driver.getRightX() - operator.getRightX()));
 
     // Reset gyro to 0° when B button is pressed
-    controller
+    driver
         .b()
         .onTrue(
             Commands.runOnce(
@@ -200,26 +229,39 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    // Test command for superstructure
-    var random = new Random();
-    Container<Integer> randomInt = new Container<>();
-    randomInt.value = 1;
-    controller
-        .x()
-        .onTrue(
-            Commands.runOnce(
-                () -> randomInt.value = random.nextInt(SuperstructureState.State.values().length)));
-    controller
+    // Operator command for algae intake
+    operator
+        .leftBumper()
+        .whileTrue(
+            superstructure
+                .runGoal(SuperstructureState.State.ALGAE_FLOOR_INTAKE.getValue())
+                .withName("Algae Floor Intake"));
+
+    // Operator commands for superstructure
+    operator
         .a()
         .whileTrue(
-            Commands.defer(
-                () -> {
-                  Logger.recordOutput(
-                      "RandomState", SuperstructureState.State.values()[randomInt.value]);
-                  return superstructure.runGoal(
-                      SuperstructureState.State.values()[randomInt.value].getValue());
-                },
-                Set.of(superstructure)));
+            superstructure
+                .runGoal(SuperstructureState.State.L1_CORAL.getValue())
+                .withName("Scoring L1 Coral"));
+    operator
+        .x()
+        .whileTrue(
+            superstructure
+                .runGoal(SuperstructureState.State.L2_CORAL.getValue())
+                .withName("Scoring L2 Coral"));
+    operator
+        .b()
+        .whileTrue(
+            superstructure
+                .runGoal(SuperstructureState.State.L3_CORAL.getValue())
+                .withName("Scoring L3 Coral"));
+    operator
+        .y()
+        .whileTrue(
+            superstructure
+                .runGoal(SuperstructureState.State.L4_CORAL.getValue())
+                .withName("Scoring L4 Coral"));
   }
 
   /**

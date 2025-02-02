@@ -11,6 +11,7 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Rotation3d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.geometry.Translation3d;
+import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public class SuperstructureConstants {
   // 2d position of superstructure root on robot (x forward from back, y off the bellypan)
@@ -26,17 +27,17 @@ public class SuperstructureConstants {
   public static final double stageThickness = 0.025;
   public static final double carriageToStage = 0.12;
   public static final double stageToStage = 0.127;
-  public static final double elevatorHeightMeters =
-      -(stageThickness * 2 + carriageToStage)
-          + 2 * (stageHeight - stageToStage)
-          + stageHeight
-          - carriageToStage;
+  public static final double elevatorHeightMeters = 1.64;
   public static final Rotation2d elevatorAngle = Rotation2d.fromDegrees(82.0);
   public static final Translation3d carriageOrigin3d =
       superstructureOrigin3d.plus(
           new Translation3d(
               stageThickness * 2 + carriageToStage,
               new Rotation3d(0.0, -elevatorAngle.getRadians(), 0.0)));
-
   public static final Rotation2d pivotSafeAngle = Rotation2d.fromDegrees(-40.0);
+  public static final LoggedTunableNumber throwHeight =
+      new LoggedTunableNumber("Superstructure/Throw/Height", 1.75);
+  public static final LoggedTunableNumber throwVelocity =
+      new LoggedTunableNumber(
+          "Superstructure/Throw/Velocity", 2.99999); // Exponential profile is weird
 }

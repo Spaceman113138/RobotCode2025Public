@@ -170,6 +170,7 @@ public class ModuleIODev implements ModuleIO {
 
     // Update turn inputs
     inputs.turnConnected = turnConnectedDebounce.calculate(turnStatus.isOK());
+    inputs.turnEncoderConnected = true;
     inputs.turnAbsolutePosition = turnAbsolutePosition.get().minus(encoderOffset);
     inputs.turnPosition = Rotation2d.fromRotations(turnPosition.getValueAsDouble());
     inputs.turnVelocityRadPerSec = Units.rotationsToRadians(turnVelocity.getValueAsDouble());

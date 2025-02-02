@@ -9,6 +9,8 @@ package org.littletonrobotics.frc2025.subsystems.superstructure;
 
 import edu.wpi.first.math.Pair;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.trajectory.ExponentialProfile;
+import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.*;
@@ -19,6 +21,8 @@ import lombok.Setter;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
+import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState.State;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
@@ -252,7 +256,9 @@ public class Superstructure extends SubsystemBase {
     dispenser.periodic();
     slam.periodic();
 
-    if (edgeCommand == null || !edgeCommand.getCommand().isScheduled()) {
+    if (DriverStation.isDisabled()) {
+      next = null;
+    } else if (edgeCommand == null || !edgeCommand.getCommand().isScheduled()) {
       // Update edge to new state
       if (next != null) {
         state = next;
@@ -272,7 +278,10 @@ public class Superstructure extends SubsystemBase {
     }
 
     // E Stop Dispenser and Elevator if Necessary
-    isEStopped = isEStopped || elevator.isShouldEStop() || dispenser.isShouldEStop();
+    isEStopped =
+        isEStopped
+            || elevator.isShouldEStop()
+            || (dispenser.isShouldEStop() && Constants.getRobot() != RobotType.DEVBOT);
     elevator.setEStopped(isEStopped);
     dispenser.setEStopped(isEStopped);
 
@@ -415,7 +424,27 @@ public class Superstructure extends SubsystemBase {
    * subsystems are complete with profiles.
    */
   private EdgeCommand getEdgeCommand(SuperstructureState from, SuperstructureState to) {
-    if ((from == State.ALGAE_STOW_FRONT.getValue() && to == State.PRE_PROCESSOR.getValue())
+    if ((from == State.ALGAE_STOW_FRONT.getValue() && to == State.THROWN.getValue())) {
+      // Algae Stow Front --> Thrown
+      return EdgeCommand.builder()
+          .command(
+              Commands.runOnce(
+                      () -> {
+                        elevator.setGoal(
+                            () ->
+                                new ExponentialProfile.State(
+                                    SuperstructureConstants.throwHeight.get(),
+                                    SuperstructureConstants.throwVelocity.get()));
+                        dispenser.setGoal(to.getPose().pivotAngle());
+                      })
+                  .andThen(
+                      getSlamCommand(Goal.SLAM_DOWN),
+                      Commands.waitUntil(this::isAtGoal),
+                      runSuperstructurePose(to.getPose()),
+                      runSuperstructureExtras(to),
+                      Commands.waitUntil(this::isAtGoal)))
+          .build();
+    } else if ((from == State.ALGAE_STOW_FRONT.getValue() && to == State.PRE_PROCESSOR.getValue())
         || (from == State.PRE_PROCESSOR.getValue() && to == State.ALGAE_STOW_FRONT.getValue())) {
       // Algae Stow Front <--> Pre-Processor
       final boolean toProcessor = to == State.PRE_PROCESSOR.getValue();
@@ -521,7 +550,8 @@ public class Superstructure extends SubsystemBase {
   }
 
   private boolean isAtGoal() {
-    return elevator.isAtGoal() && dispenser.isAtGoal();
+    return elevator.isAtGoal()
+        && (dispenser.isAtGoal() || Constants.getRobot() == RobotType.DEVBOT);
   }
 
   /** All edge commands should finish and exit properly. */

@@ -32,12 +32,12 @@ public class ElevatorIOSim implements ElevatorIO {
           0,
           -gearbox.KtNMPerAmp
               / (gearbox.rOhms
-                  * Math.pow(Elevator.drumRadiusMeters, 2)
+                  * Math.pow(Elevator.drumRadius, 2)
                   * (carriageMassKg + stagesMassKg)
                   * gearbox.KvRadPerSecPerVolt));
   public static final Vector<N2> B =
       VecBuilder.fill(
-          0.0, gearbox.KtNMPerAmp / (Elevator.drumRadiusMeters * (carriageMassKg + stagesMassKg)));
+          0.0, gearbox.KtNMPerAmp / (Elevator.drumRadius * (carriageMassKg + stagesMassKg)));
 
   // State given by elevator carriage position and velocity
   // Input given by torque current to motor
@@ -62,15 +62,15 @@ public class ElevatorIOSim implements ElevatorIO {
       // Run control at 1khz
       for (int i = 0; i < Constants.loopPeriodSecs / (1.0 / 1000.0); i++) {
         setInputTorqueCurrent(
-            controller.calculate(simState.get(0) / Elevator.drumRadiusMeters) + feedforward);
+            controller.calculate(simState.get(0) / Elevator.drumRadius) + feedforward);
         update(1.0 / 1000.0);
       }
     }
 
-    inputs.positionRad = simState.get(0) / Elevator.drumRadiusMeters;
-    inputs.velocityRadPerSec = simState.get(1) / Elevator.drumRadiusMeters;
+    inputs.positionRad = simState.get(0) / Elevator.drumRadius;
+    inputs.velocityRadPerSec = simState.get(1) / Elevator.drumRadius;
     inputs.appliedVolts = new double[] {appliedVolts};
-    inputs.currentAmps = new double[] {Math.copySign(inputTorqueCurrent, appliedVolts)};
+    inputs.torqueCurrentAmps = new double[] {Math.copySign(inputTorqueCurrent, appliedVolts)};
   }
 
   @Override
@@ -106,12 +106,12 @@ public class ElevatorIOSim implements ElevatorIO {
     inputTorqueCurrent = torqueCurrent;
     appliedVolts =
         gearbox.getVoltage(
-            gearbox.getTorque(inputTorqueCurrent), simState.get(1, 0) / Elevator.drumRadiusMeters);
+            gearbox.getTorque(inputTorqueCurrent), simState.get(1, 0) / Elevator.drumRadius);
     appliedVolts = MathUtil.clamp(appliedVolts, -12.0, 12.0);
   }
 
   private void setInputVoltage(double voltage) {
-    setInputTorqueCurrent(gearbox.getCurrent(simState.get(1) / Elevator.drumRadiusMeters, voltage));
+    setInputTorqueCurrent(gearbox.getCurrent(simState.get(1) / Elevator.drumRadius, voltage));
   }
 
   private void update(double dt) {

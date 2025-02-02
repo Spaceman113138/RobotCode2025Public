@@ -61,6 +61,7 @@ public class SuperstructureState {
             .pose(SuperstructurePose.Preset.ALGAE_FLOOR_INTAKE.getPose())
             .slamGoal(Slam.Goal.SLAM_DOWN)
             .gripperCurrent(Dispenser.gripperIntakeCurrent)
+            .intakeVolts(Slam.floorIntakeVolts)
             .height(Height.BOTTOM)
             .build()),
     ALGAE_L2_INTAKE(

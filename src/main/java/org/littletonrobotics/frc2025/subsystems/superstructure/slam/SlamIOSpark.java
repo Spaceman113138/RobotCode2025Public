@@ -19,26 +19,27 @@ import edu.wpi.first.math.filter.Debouncer;
 import java.util.function.DoubleSupplier;
 
 public class SlamIOSpark implements SlamIO {
-  private static final double reduction = 5.0;
+  private static final double reduction = 1.0;
+  private static final boolean inverted = false;
+  private int currentLimit = 40;
 
   private final SparkBase spark;
   private final RelativeEncoder encoder;
   private final SparkMaxConfig config;
 
   private final Debouncer connectedDebouncer = new Debouncer(0.5);
-  private int currentLimit = 30;
   private boolean brakeModeEnabled = true;
 
   public SlamIOSpark() {
-    spark = new SparkMax(0, SparkLowLevel.MotorType.kBrushless);
+    spark = new SparkMax(7, SparkLowLevel.MotorType.kBrushless);
     encoder = spark.getEncoder();
 
     config = new SparkMaxConfig();
     config
         .idleMode(
             brakeModeEnabled ? SparkBaseConfig.IdleMode.kBrake : SparkBaseConfig.IdleMode.kCoast)
-        .smartCurrentLimit(currentLimit, 50)
-        .voltageCompensation(12.0);
+        .inverted(inverted)
+        .smartCurrentLimit(currentLimit);
     config
         .encoder
         .positionConversionFactor(reduction)
@@ -90,7 +91,7 @@ public class SlamIOSpark implements SlamIO {
                       5,
                       () ->
                           spark.configure(
-                              config.smartCurrentLimit(currentLimit, 50),
+                              config.smartCurrentLimit(currentLimit),
                               SparkBase.ResetMode.kNoResetSafeParameters,
                               SparkBase.PersistMode.kNoPersistParameters)))
           .start();

@@ -26,7 +26,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
 
 public class ElevatorIOTalonFX implements ElevatorIO {
-  public static final double reduction = 5.0;
+  public static final double reduction = 4.0;
 
   // Hardware
   private final TalonFX talon;
@@ -39,10 +39,12 @@ public class ElevatorIOTalonFX implements ElevatorIO {
   private final StatusSignal<Angle> position;
   private final StatusSignal<AngularVelocity> velocity;
   private final StatusSignal<Voltage> appliedVolts;
-  private final StatusSignal<Current> current;
+  private final StatusSignal<Current> torqueCurrent;
+  private final StatusSignal<Current> supplyCurrent;
   private final StatusSignal<Temperature> temp;
   private final StatusSignal<Voltage> followerAppliedVolts;
-  private final StatusSignal<Current> followerCurrent;
+  private final StatusSignal<Current> followerTorqueCurrent;
+  private final StatusSignal<Current> followerSupplyCurrent;
   private final StatusSignal<Temperature> followerTemp;
 
   private final Debouncer connectedDebouncer = new Debouncer(0.5);
@@ -54,41 +56,47 @@ public class ElevatorIOTalonFX implements ElevatorIO {
   private final VoltageOut voltageRequest = new VoltageOut(0.0).withUpdateFreqHz(0.0);
 
   public ElevatorIOTalonFX() {
-    talon = new TalonFX(0, "*");
-    followerTalon = new TalonFX(1, "*");
-    followerTalon.setControl(new Follower(talon.getDeviceID(), false));
+    talon = new TalonFX(13, "*");
+    followerTalon = new TalonFX(14, "*");
+    followerTalon.setControl(new Follower(talon.getDeviceID(), true));
 
     // Configure motor
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.Slot0 = new Slot0Configs().withKP(0).withKI(0).withKD(0);
     config.Feedback.SensorToMechanismRatio = reduction;
-    config.TorqueCurrent.PeakForwardTorqueCurrent = 120.0;
-    config.TorqueCurrent.PeakReverseTorqueCurrent = -120.0;
-    config.CurrentLimits.StatorCurrentLimit = 120.0;
+    config.TorqueCurrent.PeakForwardTorqueCurrent = 80.0;
+    config.TorqueCurrent.PeakReverseTorqueCurrent = -80.0;
+    config.CurrentLimits.StatorCurrentLimit = 80.0;
     config.CurrentLimits.StatorCurrentLimitEnable = true;
-    config.MotorOutput.Inverted = InvertedValue.CounterClockwise_Positive;
+    config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     tryUntilOk(5, () -> talon.getConfigurator().apply(config, 0.25));
 
     position = talon.getPosition();
     velocity = talon.getVelocity();
     appliedVolts = talon.getMotorVoltage();
-    current = talon.getStatorCurrent();
+    torqueCurrent = talon.getTorqueCurrent();
+    supplyCurrent = talon.getSupplyCurrent();
     temp = talon.getDeviceTemp();
     followerAppliedVolts = followerTalon.getMotorVoltage();
-    followerCurrent = followerTalon.getStatorCurrent();
+    followerTorqueCurrent = followerTalon.getTorqueCurrent();
+    followerSupplyCurrent = followerTalon.getSupplyCurrent();
     followerTemp = followerTalon.getDeviceTemp();
 
     BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0, position, velocity, appliedVolts, current, temp);
+        50.0, position, velocity, appliedVolts, torqueCurrent, temp);
     ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 
   @Override
   public void updateInputs(ElevatorIOInputs inputs) {
     boolean connected =
-        BaseStatusSignal.refreshAll(position, velocity, appliedVolts, current, temp).isOK();
+        BaseStatusSignal.refreshAll(
+                position, velocity, appliedVolts, torqueCurrent, supplyCurrent, temp)
+            .isOK();
     boolean followerConnected =
-        BaseStatusSignal.refreshAll(followerAppliedVolts, followerCurrent, followerTemp).isOK();
+        BaseStatusSignal.refreshAll(
+                followerAppliedVolts, followerTorqueCurrent, followerSupplyCurrent, followerTemp)
+            .isOK();
 
     inputs.motorConnected = connectedDebouncer.calculate(connected);
     inputs.followerConnected = connectedDebouncer.calculate(followerConnected);
@@ -96,8 +104,10 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     inputs.velocityRadPerSec = Units.rotationsToRadians(velocity.getValueAsDouble());
     inputs.appliedVolts =
         new double[] {appliedVolts.getValueAsDouble(), followerAppliedVolts.getValueAsDouble()};
-    inputs.currentAmps =
-        new double[] {current.getValueAsDouble(), followerCurrent.getValueAsDouble()};
+    inputs.torqueCurrentAmps =
+        new double[] {torqueCurrent.getValueAsDouble(), followerTorqueCurrent.getValueAsDouble()};
+    inputs.supplyCurrentAmps =
+        new double[] {supplyCurrent.getValueAsDouble(), followerSupplyCurrent.getValueAsDouble()};
     inputs.tempCelsius = new double[] {temp.getValueAsDouble(), followerTemp.getValueAsDouble()};
   }
 
@@ -119,7 +129,9 @@ public class ElevatorIOTalonFX implements ElevatorIO {
   @Override
   public void runPosition(double positionRad, double feedforward) {
     talon.setControl(
-        positionTorqueCurrentRequest.withPosition(positionRad).withFeedForward(feedforward));
+        positionTorqueCurrentRequest
+            .withPosition(Units.radiansToRotations(positionRad))
+            .withFeedForward(feedforward));
   }
 
   @Override

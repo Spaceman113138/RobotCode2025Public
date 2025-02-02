@@ -12,6 +12,7 @@ import edu.wpi.first.math.Nat;
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.interpolation.TimeInterpolatableBuffer;
+import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
@@ -66,13 +67,8 @@ public class RobotState {
   }
 
   // Pose Estimation Members
-  @Getter
-  @AutoLogOutput(key = "RobotState/OdometryPose")
-  private Pose2d odometryPose = new Pose2d();
-
-  @Getter
-  @AutoLogOutput(key = "RobotState/EstimatedPose")
-  private Pose2d estimatedPose = new Pose2d();
+  @Getter @AutoLogOutput private Pose2d odometryPose = new Pose2d();
+  @Getter @AutoLogOutput private Pose2d estimatedPose = new Pose2d();
 
   private final TimeInterpolatableBuffer<Pose2d> poseBuffer =
       TimeInterpolatableBuffer.createBuffer(poseBufferSizeSec);
@@ -91,6 +87,10 @@ public class RobotState {
 
   private final Map<Integer, TxTyPoseRecord> txTyPoses = new HashMap<>();
   private Set<AlgaePoseRecord> algaePoses = new HashSet<>();
+
+  @Getter
+  @AutoLogOutput(key = "RobotState/RobotVelocity")
+  private ChassisSpeeds robotVelocity = new ChassisSpeeds();
 
   private RobotState() {
     for (int i = 0; i < 3; ++i) {
@@ -243,6 +243,15 @@ public class RobotState {
     txTyPoses.put(
         observation.tagId(),
         new TxTyPoseRecord(robotPose, camToTagTranslation.getNorm(), observation.timestamp()));
+  }
+
+  public void addDriveSpeeds(ChassisSpeeds speeds) {
+    robotVelocity = speeds;
+  }
+
+  @AutoLogOutput(key = "RobotState/FieldVelocity")
+  public ChassisSpeeds getFieldVelocity() {
+    return ChassisSpeeds.fromRobotRelativeSpeeds(robotVelocity, getRotation());
   }
 
   /** Get 2d pose estimate of robot if not stale. */

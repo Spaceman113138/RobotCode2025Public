@@ -25,6 +25,7 @@ import java.util.function.Supplier;
 import lombok.Getter;
 import lombok.Setter;
 import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOInputsAutoLogged;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
@@ -95,21 +96,20 @@ public class Dispenser {
   @Setter private double tunnelVolts = 0.0;
   @Setter private double gripperCurrent = 0.0;
 
-  @AutoLogOutput(key = "Dispenser/HasAlgae")
-  private boolean hasAlgae = false;
+  @AutoLogOutput private boolean hasAlgae = false;
 
   private Debouncer algaeDebouncer = new Debouncer(0.1);
-  private Debouncer toleranceDebouncer = new Debouncer(.5, DebounceType.kRising);
+  private Debouncer toleranceDebouncer = new Debouncer(0.25, DebounceType.kRising);
 
   // Disconnected alerts
   private final Alert pivotMotorDisconnectedAlert =
-      new Alert("Davis Dispenser pivot motor disconnected!", Alert.AlertType.kWarning);
+      new Alert("Dispenser pivot motor disconnected!", Alert.AlertType.kWarning);
   private final Alert pivotEncoderDisconnectedAlert =
-      new Alert("Davis Dispenser encoder disconnected!", Alert.AlertType.kWarning);
+      new Alert("Dispenser encoder disconnected!", Alert.AlertType.kWarning);
   private final Alert tunnelDisconnectedAlert =
-      new Alert("Davis Dispenser tunnel disconnected!", Alert.AlertType.kWarning);
+      new Alert("Dispenser tunnel disconnected!", Alert.AlertType.kWarning);
   private final Alert gripperDisconnectedAlert =
-      new Alert("Davis Dispenser gripper disconnected!", Alert.AlertType.kWarning);
+      new Alert("Dispenser gripper disconnected!", Alert.AlertType.kWarning);
 
   public Dispenser(DispenserIO pivotIO, RollerSystemIO tunnelIO, RollerSystemIO gripperIO) {
     this.pivotIO = pivotIO;
@@ -132,10 +132,13 @@ public class Dispenser {
     gripperIO.updateInputs(gripperInputs);
     Logger.processInputs("Dispenser/Gripper", gripperInputs);
 
-    pivotMotorDisconnectedAlert.set(!pivotInputs.motorConnected);
-    pivotEncoderDisconnectedAlert.set((!pivotInputs.encoderConnected));
+    pivotMotorDisconnectedAlert.set(
+        !pivotInputs.motorConnected && Constants.getRobot() == RobotType.COMPBOT);
+    pivotEncoderDisconnectedAlert.set(
+        !pivotInputs.encoderConnected && Constants.getRobot() == RobotType.COMPBOT);
     tunnelDisconnectedAlert.set(!tunnelInputs.connected);
-    gripperDisconnectedAlert.set(!gripperInputs.connected);
+    gripperDisconnectedAlert.set(
+        !gripperInputs.connected && Constants.getRobot() == RobotType.COMPBOT);
 
     // Update tunable numbers
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
@@ -151,14 +154,6 @@ public class Dispenser {
     // Calculate combined angle
     finalAngle = calculateFinalAngle(pivotInputs.internalPosition);
 
-    // Check if out of tolerance
-    boolean outOfTolerance =
-        Math.abs(finalAngle.getRadians() - setpoint.position) > tolerance.get();
-    shouldEStop =
-        toleranceDebouncer.calculate(outOfTolerance)
-            || finalAngle.getRadians() < minAngleRad
-            || finalAngle.getRadians() > maxAngleRad;
-
     // Run profile
     final boolean shouldRunProfile =
         !stopProfile
@@ -167,6 +162,14 @@ public class Dispenser {
             && !isEStopped
             && DriverStation.isEnabled();
     Logger.recordOutput("Dispenser/RunningProfile", shouldRunProfile);
+
+    // Check if out of tolerance
+    boolean outOfTolerance =
+        Math.abs(finalAngle.getRadians() - setpoint.position) > tolerance.get();
+    shouldEStop =
+        toleranceDebouncer.calculate(outOfTolerance && shouldRunProfile)
+            || finalAngle.getRadians() < minAngleRad
+            || finalAngle.getRadians() > maxAngleRad;
     if (shouldRunProfile) {
       // Clamp goal
       var goalState = new State(MathUtil.clamp(goal.getAsDouble(), minAngleRad, maxAngleRad), 0.0);
@@ -187,6 +190,7 @@ public class Dispenser {
     } else {
       // Reset setpoint
       setpoint = new State(finalAngle.getRadians(), 0.0);
+
       // Clear logs
       Logger.recordOutput("Dispenser/Profile/SetpointPositionRad", 0.0);
       Logger.recordOutput("Dispenser/Profile/SetpointVelocityRadPerSec", 0.0);
