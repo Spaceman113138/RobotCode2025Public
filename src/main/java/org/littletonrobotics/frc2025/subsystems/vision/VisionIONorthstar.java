@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.wpi.first.networktables.*;
 import edu.wpi.first.util.WPIUtilJNI;
 import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import org.littletonrobotics.frc2025.FieldConstants;
 
@@ -86,7 +87,9 @@ public class VisionIONorthstar implements VisionIO {
   public void updateInputs(
       AprilTagVisionIOInputs aprilTagInputs, ObjDetectVisionIOInputs objDetectInputs) {
     // Publish timestamp
-    timestampPublisher.set(WPIUtilJNI.getSystemTime() / 1000000);
+    if (RobotController.isSystemTimeValid()) {
+      timestampPublisher.set(WPIUtilJNI.getSystemTime() / 1000000);
+    }
 
     // Get AprilTag data
     var aprilTagQueue = observationSubscriber.readQueue();
