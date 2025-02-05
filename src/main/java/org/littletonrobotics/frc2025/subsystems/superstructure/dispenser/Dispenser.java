@@ -11,8 +11,9 @@ import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.filter.Debouncer.DebounceType;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.trajectory.ExponentialProfile;
-import edu.wpi.first.math.trajectory.ExponentialProfile.State;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
@@ -41,12 +42,14 @@ public class Dispenser {
   private static final double minAngleRad = calculateFinalAngle(minAngle).getRadians();
 
   // Tunable numbers
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Dispenser/kP", 4000.0);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Dispenser/kD", 2000.0);
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Dispenser/kS", 1.2);
-  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Dispenser/kG", 0.0);
-  private static final LoggedTunableNumber maxTorque =
-      new LoggedTunableNumber("Dispenser/MaxTorqueNm", 2.0);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Dispenser/kP");
+  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Dispenser/kD");
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Dispenser/kS");
+  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Dispenser/kG");
+  private static final LoggedTunableNumber maxVelocityDegPerSec =
+      new LoggedTunableNumber("Dispenser/MaxVelocityDegreesPerSec", 500);
+  private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
+      new LoggedTunableNumber("Dispenser/MaxAccelerationDegreesPerSec2", 3000);
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Dispenser/StaticCharacterizationVelocityThresh", 0.1);
   private static final LoggedTunableNumber algaeIntakeCurrentThresh =
@@ -61,6 +64,23 @@ public class Dispenser {
       new LoggedTunableNumber("Dispenser/TunnelIntakeVolts", -6.0);
   public static final LoggedTunableNumber tolerance =
       new LoggedTunableNumber("Dispenser/Tolerance", .1);
+
+  static {
+    switch (Constants.getRobot()) {
+      case SIMBOT -> {
+        kP.initDefault(4000);
+        kD.initDefault(2000);
+        kS.initDefault(1.2);
+        kG.initDefault(0.0);
+      }
+      default -> {
+        kP.initDefault(0);
+        kD.initDefault(0);
+        kS.initDefault(0);
+        kG.initDefault(0);
+      }
+    }
+  }
 
   // Hardware
   private final DispenserIO pivotIO;
@@ -82,7 +102,7 @@ public class Dispenser {
   @AutoLogOutput(key = "Dispenser/MeasuredAngle")
   private Rotation2d finalAngle = new Rotation2d();
 
-  private ExponentialProfile profile;
+  private TrapezoidProfile profile;
   @Getter private State setpoint = new State();
   private DoubleSupplier goal = () -> 0.0;
   private boolean stopProfile = false;
@@ -116,7 +136,11 @@ public class Dispenser {
     this.tunnelIO = tunnelIO;
     this.gripperIO = gripperIO;
 
-    profile = new ExponentialProfile(fromMaxTorque(maxTorque.get()));
+    profile =
+        new TrapezoidProfile(
+            new TrapezoidProfile.Constraints(
+                Units.degreesToRadians(maxVelocityDegPerSec.get()),
+                Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
 
     if (Constants.getRobot() == Constants.RobotType.SIMBOT) {
       new Trigger(() -> DriverStation.getStickButtonPressed(2, 1))
@@ -144,8 +168,13 @@ public class Dispenser {
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
       pivotIO.setPID(kP.get(), 0.0, kD.get());
     }
-    if (maxTorque.hasChanged(hashCode())) {
-      profile = new ExponentialProfile(fromMaxTorque(maxTorque.get()));
+    if (maxVelocityDegPerSec.hasChanged(hashCode())
+        || maxAccelerationDegPerSec2.hasChanged(hashCode())) {
+      profile =
+          new TrapezoidProfile(
+              new TrapezoidProfile.Constraints(
+                  Units.degreesToRadians(maxVelocityDegPerSec.get()),
+                  Units.degreesToRadians(maxAccelerationDegPerSec2.get())));
     }
 
     // Set coast mode
@@ -245,13 +274,6 @@ public class Dispenser {
     if (brakeModeEnabled == enabled) return;
     brakeModeEnabled = enabled;
     pivotIO.setBrakeMode(enabled);
-  }
-
-  private static ExponentialProfile.Constraints fromMaxTorque(double maxTorque) {
-    return ExponentialProfile.Constraints.fromStateSpace(
-        maxTorque / DispenserIOSim.gearbox.KtNMPerAmp,
-        DispenserIOSim.A.get(1, 1),
-        DispenserIOSim.B.get(1));
   }
 
   public Command staticCharacterization(double outputRampRate) {

@@ -116,8 +116,7 @@ public class ElevatorIOSim implements ElevatorIO {
 
   private void update(double dt) {
     inputTorqueCurrent =
-        MathUtil.clamp(
-            inputTorqueCurrent, -gearbox.stallCurrentAmps / 2.0, gearbox.stallCurrentAmps / 2.0);
+        MathUtil.clamp(inputTorqueCurrent, -gearbox.stallCurrentAmps, gearbox.stallCurrentAmps);
     Matrix<N2, N1> updatedState =
         NumericalIntegration.rkdp(
             (Matrix<N2, N1> x, Matrix<N1, N1> u) ->
@@ -137,9 +136,9 @@ public class ElevatorIOSim implements ElevatorIO {
       simState.set(1, 0, 0.0);
       simState.set(0, 0, 0.0);
     }
-    if (simState.get(0) >= SuperstructureConstants.elevatorHeightMeters) {
+    if (simState.get(0) >= SuperstructureConstants.elevatorMaxTravel) {
       simState.set(1, 0, 0.0);
-      simState.set(0, 0, SuperstructureConstants.elevatorHeightMeters);
+      simState.set(0, 0, SuperstructureConstants.elevatorMaxTravel);
     }
   }
 }

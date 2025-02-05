@@ -10,9 +10,8 @@ package org.littletonrobotics.frc2025.subsystems.superstructure.elevator;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.filter.Debouncer.DebounceType;
-import edu.wpi.first.math.trajectory.ExponentialProfile;
-import edu.wpi.first.math.trajectory.ExponentialProfile.Constraints;
-import edu.wpi.first.math.trajectory.ExponentialProfile.State;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.math.trajectory.TrapezoidProfile.State;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -35,12 +34,14 @@ public class Elevator {
   public static final double drumRadius = Units.inchesToMeters(1.0);
 
   // Tunable numbers
-  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Elevator/kP", 1200);
-  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Elevator/kD", 30);
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Elevator/kS", 0);
-  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Elevator/kG", 5);
-  private static final LoggedTunableNumber maxTorque =
-      new LoggedTunableNumber("Elevator/MaxTorqueNm", 45.0);
+  private static final LoggedTunableNumber kP = new LoggedTunableNumber("Elevator/kP");
+  private static final LoggedTunableNumber kD = new LoggedTunableNumber("Elevator/kD");
+  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Elevator/kS");
+  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Elevator/kG");
+  private static final LoggedTunableNumber maxVelocityMetersPerSec =
+      new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 3.5);
+  private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
+      new LoggedTunableNumber("Elevator/MaxAccelerationMetersPerSec2", 20);
   private static final LoggedTunableNumber homingVolts =
       new LoggedTunableNumber("Elevator/HomingVolts", -2.0);
   private static final LoggedTunableNumber homingTimeSecs =
@@ -52,6 +53,23 @@ public class Elevator {
   private static final LoggedTunableNumber tolerance =
       new LoggedTunableNumber("Elevator/Tolerance", 0.2);
 
+  static {
+    switch (Constants.getRobot()) {
+      case COMPBOT, DEVBOT -> {
+        kP.initDefault(1200);
+        kD.initDefault(30);
+        kS.initDefault(0);
+        kG.initDefault(5);
+      }
+      case SIMBOT -> {
+        kP.initDefault(5000);
+        kD.initDefault(2000);
+        kS.initDefault(5);
+        kG.initDefault(50);
+      }
+    }
+  }
+
   private final ElevatorIO io;
   private final ElevatorIOInputsAutoLogged inputs = new ElevatorIOInputsAutoLogged();
 
@@ -62,7 +80,7 @@ public class Elevator {
 
   @AutoLogOutput private boolean brakeModeEnabled = true;
 
-  private ExponentialProfile profile;
+  private TrapezoidProfile profile;
   @Getter private State setpoint = new State();
   private Supplier<State> goal = State::new;
   private boolean stopProfile = false;
@@ -85,7 +103,10 @@ public class Elevator {
   public Elevator(ElevatorIO io) {
     this.io = io;
 
-    profile = new ExponentialProfile(fromMaxTorque(maxTorque.get()));
+    profile =
+        new TrapezoidProfile(
+            new TrapezoidProfile.Constraints(
+                maxVelocityMetersPerSec.get(), maxAccelerationMetersPerSec2.get()));
   }
 
   public void periodic() {
@@ -98,8 +119,12 @@ public class Elevator {
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
       io.setPID(kP.get(), 0.0, kD.get());
     }
-    if (maxTorque.hasChanged(hashCode())) {
-      profile = new ExponentialProfile(fromMaxTorque(maxTorque.get()));
+    if (maxVelocityMetersPerSec.hasChanged(hashCode())
+        || maxAccelerationMetersPerSec2.hasChanged(hashCode())) {
+      profile =
+          new TrapezoidProfile(
+              new TrapezoidProfile.Constraints(
+                  maxVelocityMetersPerSec.get(), maxAccelerationMetersPerSec2.get()));
     }
 
     // Set coast mode
@@ -121,16 +146,14 @@ public class Elevator {
       // Clamp goal
       var goalState =
           new State(
-              MathUtil.clamp(
-                  goal.get().position, 0.0, SuperstructureConstants.elevatorHeightMeters),
+              MathUtil.clamp(goal.get().position, 0.0, SuperstructureConstants.elevatorMaxTravel),
               goal.get().velocity);
       setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
       if (setpoint.position < 0.0
-          || setpoint.position > SuperstructureConstants.elevatorHeightMeters) {
+          || setpoint.position > SuperstructureConstants.elevatorMaxTravel) {
         setpoint =
             new State(
-                MathUtil.clamp(
-                    setpoint.position, 0.0, SuperstructureConstants.elevatorHeightMeters),
+                MathUtil.clamp(setpoint.position, 0.0, SuperstructureConstants.elevatorMaxTravel),
                 0.0);
       }
       io.runPosition(
@@ -246,13 +269,6 @@ public class Elevator {
 
   public double getGoalMeters() {
     return goal.get().position;
-  }
-
-  private static Constraints fromMaxTorque(double maxTorque) {
-    return Constraints.fromStateSpace(
-        maxTorque / ElevatorIOSim.gearbox.KtNMPerAmp,
-        ElevatorIOSim.A.get(1, 1),
-        ElevatorIOSim.B.get(1));
   }
 
   private static class StaticCharacterizationState {

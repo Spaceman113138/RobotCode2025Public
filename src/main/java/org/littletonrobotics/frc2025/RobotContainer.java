@@ -10,6 +10,8 @@ package org.littletonrobotics.frc2025;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.wpilibj.Alert;
+import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.XboxController;
@@ -20,9 +22,12 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
+import org.littletonrobotics.frc2025.commands.IntakeCommands;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
+import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSpark;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
@@ -48,13 +53,21 @@ public class RobotContainer {
   private Drive drive;
   private Vision vision;
   private final Superstructure superstructure;
+  private RollerSystem funnel;
 
   // Controller
   private final CommandXboxController driver = new CommandXboxController(0);
   private final CommandXboxController operator = new CommandXboxController(1);
   private final OverrideSwitches overrides = new OverrideSwitches(5);
-  private final Trigger elevatorDisable = overrides.driverSwitch(1);
-  private final Trigger elevatorCoast = overrides.driverSwitch(2);
+  private final Trigger robotRelative = overrides.driverSwitch(0);
+  private final Trigger superstructureDisable = overrides.driverSwitch(1);
+  private final Trigger superstructureCoast = overrides.driverSwitch(2);
+  private final Alert driverDisconnected =
+      new Alert("Driver controller disconnected (port 0).", AlertType.kWarning);
+  private final Alert operatorDisconnected =
+      new Alert("Operator controller disconnected (port 1).", AlertType.kWarning);
+  private final Alert overrideDisconnected =
+      new Alert("Override controller disconnected (port 5).", AlertType.kInfo);
 
   private boolean elevatorCoastOverride = false;
 
@@ -101,8 +114,12 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
           elevator = new Elevator(new ElevatorIOTalonFX());
+          dispenser =
+              new Dispenser(
+                  new DispenserIO() {}, new RollerSystemIOSpark(1, true), new RollerSystemIO() {});
           slam =
               new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false, 1.0));
+          funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(0, false));
         }
         case SIMBOT -> {
           drive =
@@ -155,6 +172,9 @@ public class RobotContainer {
     if (slam == null) {
       slam = new Slam(new SlamIO() {}, new RollerSystemIO() {});
     }
+    if (funnel == null) {
+      funnel = new RollerSystem("Funnel", new RollerSystemIO() {});
+    }
     superstructure = new Superstructure(elevator, dispenser, slam);
 
     // Set up auto routines
@@ -177,9 +197,9 @@ public class RobotContainer {
     autoChooser.addOption("Pivot static", dispenser.staticCharacterization(2.0));
 
     // Set up overrides
-    superstructure.setDisabledOverride(elevatorDisable);
-    elevator.setOverrides(() -> elevatorCoastOverride, elevatorDisable);
-    dispenser.setOverrides(() -> elevatorCoastOverride, elevatorDisable);
+    superstructure.setDisabledOverride(superstructureDisable);
+    elevator.setOverrides(() -> elevatorCoastOverride, superstructureDisable);
+    dispenser.setOverrides(() -> elevatorCoastOverride, superstructureDisable);
     slam.setCoastOverride(() -> elevatorCoastOverride);
 
     // Configure the button bindings
@@ -193,7 +213,7 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    elevatorCoast
+    superstructureCoast
         .onTrue(
             Commands.runOnce(
                     () -> {
@@ -213,7 +233,8 @@ public class RobotContainer {
             drive,
             () -> -driver.getLeftY() - operator.getLeftY(),
             () -> -driver.getLeftX() - operator.getLeftX(),
-            () -> -driver.getRightX() - operator.getRightX()));
+            () -> -driver.getRightX() - operator.getRightX(),
+            robotRelative.getAsBoolean()));
 
     // Reset gyro to 0° when B button is pressed
     driver
@@ -236,6 +257,9 @@ public class RobotContainer {
             superstructure
                 .runGoal(SuperstructureState.State.ALGAE_FLOOR_INTAKE.getValue())
                 .withName("Algae Floor Intake"));
+
+    // Operator command for coral intake
+    operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
 
     // Operator commands for superstructure
     operator
@@ -262,6 +286,16 @@ public class RobotContainer {
             superstructure
                 .runGoal(SuperstructureState.State.L4_CORAL.getValue())
                 .withName("Scoring L4 Coral"));
+  }
+
+  public void checkControllers() {
+    driverDisconnected.set(
+        !DriverStation.isJoystickConnected(driver.getHID().getPort())
+            || !DriverStation.getJoystickIsXbox(driver.getHID().getPort()));
+    operatorDisconnected.set(
+        !DriverStation.isJoystickConnected(operator.getHID().getPort())
+            || !DriverStation.getJoystickIsXbox(operator.getHID().getPort()));
+    overrideDisconnected.set(!overrides.isConnected());
   }
 
   /**

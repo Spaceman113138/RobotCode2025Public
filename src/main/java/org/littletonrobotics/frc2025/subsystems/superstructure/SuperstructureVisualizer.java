@@ -70,24 +70,20 @@ public class SuperstructureVisualizer {
     Logger.recordOutput("Mechanism2d/" + name, mechanism);
 
     // Max of top of carriage or starting height
-    final double heightFromBottom = elevatorHeightMeters + stageThickness * 2.0 + carriageToStage;
+    final double heightFromBottom =
+        elevatorHeightMeters + stageThickness * 2.0 + dispenserToCarriage;
     final double firstStageHeight =
         Math.max(
-            heightFromBottom + carriageToStage - stageHeight - (stageThickness / 2.0),
+            heightFromBottom + dispenserToCarriage - stageHeight - (stageThickness / 2.0),
             stageThickness * (3.0 / 2.0));
     final double secondStageHeight =
         Math.max(
-            heightFromBottom
-                + carriageToStage
-                - stageHeight
-                + stageToStage
-                - stageHeight
-                - (stageThickness / 2.0),
-            stageThickness * (1.0 / 2.0));
+            firstStageHeight - (stageThickness / 2.0) - stageHeight + stageToStage,
+            stageThickness * (1.0 / 2.0) + stageToStageOffset);
 
     Pose3d pivotPose3d =
         new Pose3d(
-            carriageOrigin3d.plus(
+            dispenserOrigin3d.plus(
                 new Translation3d(
                     elevatorHeightMeters, new Rotation3d(0.0, -elevatorAngle.getRadians(), 0.0))),
             new Rotation3d(
@@ -97,7 +93,7 @@ public class SuperstructureVisualizer {
                 0.0));
 
     Logger.recordOutput(
-        "Mechanism3d/" + name,
+        "Mechanism3d/" + name + "/Elevator",
         // Outer Stage
         new Pose3d(
             superstructureOrigin3d.plus(

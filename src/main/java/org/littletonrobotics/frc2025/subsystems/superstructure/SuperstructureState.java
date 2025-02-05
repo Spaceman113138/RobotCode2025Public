@@ -113,22 +113,26 @@ public class SuperstructureState {
     L3_CORAL_REVERSED(
         SuperstructureState.builder()
             .pose(SuperstructurePose.Preset.L3_CORAL_REVERSED.getPose())
+            .reversed(true)
             .gripperCurrent(Dispenser.gripperIntakeCurrent)
             .height(Height.SECOND_STAGE)
             .build()),
     L4_CORAL_REVERSED(
         SuperstructureState.builder()
             .pose(SuperstructurePose.Preset.L4_CORAL_REVERSED.getPose())
+            .reversed(true)
             .gripperCurrent(Dispenser.gripperIntakeCurrent)
             .height(Height.SECOND_STAGE)
             .build()),
     L3_CORAL_UNREVERSED(
         State.L3_CORAL_REVERSED.getValue().toBuilder()
             .pose(SuperstructurePose.Preset.L3_CORAL_UNREVERSED.getPose())
+            .reversed(false)
             .build()),
     L4_CORAL_UNREVERSED(
         State.L4_CORAL_REVERSED.getValue().toBuilder()
             .pose(SuperstructurePose.Preset.L4_CORAL_UNREVERSED.getPose())
+            .reversed(false)
             .build()),
     L3_CORAL_REVERSED_EJECT(
         L3_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build()),

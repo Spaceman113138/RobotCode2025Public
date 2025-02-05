@@ -120,8 +120,8 @@ public class Drive extends SubsystemBase {
 
     // Log empty setpoint states when disabled
     if (DriverStation.isDisabled()) {
-      Logger.recordOutput("SwerveStates/Setpoints", new SwerveModuleState[] {});
-      Logger.recordOutput("SwerveStates/SetpointsUnoptimized", new SwerveModuleState[] {});
+      Logger.recordOutput("Drive/SwerveStates/Setpoints", new SwerveModuleState[] {});
+      Logger.recordOutput("Drive/SwerveStates/SetpointsUnoptimized", new SwerveModuleState[] {});
     }
 
     // Send odometry updates to robot state
@@ -209,9 +209,9 @@ public class Drive extends SubsystemBase {
     SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
 
     // Log unoptimized setpoints and setpoint speeds
-    Logger.recordOutput("SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
-    Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
+    Logger.recordOutput("Drive/SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
+    Logger.recordOutput("Drive/SwerveStates/Setpoints", setpointStates);
+    Logger.recordOutput("Drive/SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
 
     // Send setpoints to modules
     for (int i = 0; i < 4; i++) {
@@ -239,9 +239,9 @@ public class Drive extends SubsystemBase {
     SwerveModuleState[] setpointStates = currentSetpoint.moduleStates();
 
     // Log unoptimized setpoints and setpoint speeds
-    Logger.recordOutput("SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
-    Logger.recordOutput("SwerveStates/Setpoints", setpointStates);
-    Logger.recordOutput("SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
+    Logger.recordOutput("Drive/SwerveStates/SetpointsUnoptimized", setpointStatesUnoptimized);
+    Logger.recordOutput("Drive/SwerveStates/Setpoints", setpointStates);
+    Logger.recordOutput("Drive/SwerveChassisSpeeds/Setpoints", currentSetpoint.chassisSpeeds());
 
     // Save module forces to swerve states for logging
     SwerveModuleState[] wheelForces = new SwerveModuleState[4];
@@ -262,7 +262,7 @@ public class Drive extends SubsystemBase {
       // Save to array for logging
       wheelForces[i] = new SwerveModuleState(wheelTorqueNm, setpointStates[i].angle);
     }
-    Logger.recordOutput("SwerveStates/ModuleForces", wheelForces);
+    Logger.recordOutput("Drive/SwerveStates/ModuleForces", wheelForces);
   }
 
   /** Runs the drive in a straight line with the specified drive output. */
@@ -292,7 +292,7 @@ public class Drive extends SubsystemBase {
   }
 
   /** Returns the module states (turn angles and drive velocities) for all the modules. */
-  @AutoLogOutput(key = "SwerveStates/Measured")
+  @AutoLogOutput(key = "Drive/SwerveStates/Measured")
   private SwerveModuleState[] getModuleStates() {
     SwerveModuleState[] states = new SwerveModuleState[4];
     for (int i = 0; i < 4; i++) {
@@ -311,7 +311,7 @@ public class Drive extends SubsystemBase {
   }
 
   /** Returns the measured chassis speeds of the robot. */
-  @AutoLogOutput(key = "SwerveChassisSpeeds/Measured")
+  @AutoLogOutput(key = "Drive/SwerveChassisSpeeds/Measured")
   private ChassisSpeeds getChassisSpeeds() {
     return kinematics.toChassisSpeeds(getModuleStates());
   }

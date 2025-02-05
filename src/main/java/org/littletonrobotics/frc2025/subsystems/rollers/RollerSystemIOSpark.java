@@ -11,9 +11,11 @@ import static org.littletonrobotics.frc2025.util.SparkUtil.*;
 
 import com.revrobotics.RelativeEncoder;
 import com.revrobotics.spark.SparkBase;
+import com.revrobotics.spark.SparkFlex;
 import com.revrobotics.spark.SparkLowLevel;
 import com.revrobotics.spark.SparkMax;
 import com.revrobotics.spark.config.SparkBaseConfig;
+import com.revrobotics.spark.config.SparkFlexConfig;
 import com.revrobotics.spark.config.SparkMaxConfig;
 import edu.wpi.first.math.filter.Debouncer;
 import java.util.function.DoubleSupplier;
@@ -21,17 +23,20 @@ import java.util.function.DoubleSupplier;
 public class RollerSystemIOSpark implements RollerSystemIO {
   private final SparkBase spark;
   private final RelativeEncoder encoder;
-  private final SparkMaxConfig config;
+  private final SparkBaseConfig config;
 
   private final Debouncer connectedDebouncer = new Debouncer(.5);
   private int currentLimit = 30;
   private boolean brakeModeEnabled = true;
 
-  public RollerSystemIOSpark() {
-    spark = new SparkMax(0, SparkLowLevel.MotorType.kBrushless);
+  public RollerSystemIOSpark(int deviceId, boolean isFlex) {
+    spark =
+        isFlex
+            ? new SparkFlex(deviceId, SparkLowLevel.MotorType.kBrushless)
+            : new SparkMax(deviceId, SparkLowLevel.MotorType.kBrushless);
     encoder = spark.getEncoder();
 
-    config = new SparkMaxConfig();
+    config = isFlex ? new SparkFlexConfig() : new SparkMaxConfig();
     config
         .idleMode(
             brakeModeEnabled ? SparkBaseConfig.IdleMode.kBrake : SparkBaseConfig.IdleMode.kCoast)

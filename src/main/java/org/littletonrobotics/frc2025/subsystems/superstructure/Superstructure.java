@@ -9,7 +9,8 @@ package org.littletonrobotics.frc2025.subsystems.superstructure;
 
 import edu.wpi.first.math.Pair;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.trajectory.ExponentialProfile;
+import edu.wpi.first.math.trajectory.TrapezoidProfile;
+import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
@@ -49,6 +50,12 @@ public class Superstructure extends SubsystemBase {
   private boolean isEStopped = false;
 
   @Setter private BooleanSupplier disabledOverride = () -> false;
+  private final Alert driverDisableAlert =
+      new Alert("Superstructure disabled due to driver override.", Alert.AlertType.kWarning);
+  private final Alert emergencyDisableAlert =
+      new Alert(
+          "Superstructure emergency disabled due to high position error. Disable the superstructure manually and reenable to reset.",
+          Alert.AlertType.kError);
 
   private final SuperstructureVisualizer measuredVisualizer =
       new SuperstructureVisualizer("Measured");
@@ -285,6 +292,9 @@ public class Superstructure extends SubsystemBase {
     elevator.setEStopped(isEStopped);
     dispenser.setEStopped(isEStopped);
 
+    driverDisableAlert.set(disabledOverride.getAsBoolean());
+    emergencyDisableAlert.set(isEStopped);
+
     // Log state
     Logger.recordOutput(
         "Superstructure/State", State.getPreset(state).map(State::toString).orElse(""));
@@ -321,6 +331,11 @@ public class Superstructure extends SubsystemBase {
         true,
         slam.getGoal().isRetracted(),
         dispenser.hasAlgae());
+  }
+
+  @AutoLogOutput(key = "Superstructure/AtGoal")
+  public boolean atGoal() {
+    return state == goal;
   }
 
   private void setGoal(SuperstructureState goal) {
@@ -432,7 +447,7 @@ public class Superstructure extends SubsystemBase {
                       () -> {
                         elevator.setGoal(
                             () ->
-                                new ExponentialProfile.State(
+                                new TrapezoidProfile.State(
                                     SuperstructureConstants.throwHeight.get(),
                                     SuperstructureConstants.throwVelocity.get()));
                         dispenser.setGoal(to.getPose().pivotAngle());
