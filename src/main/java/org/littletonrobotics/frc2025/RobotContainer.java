@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.commands.IntakeCommands;
@@ -46,22 +47,22 @@ import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
 public class RobotContainer {
-  // Load RobotState class
-  private final RobotState robotState = RobotState.getInstance();
-
   // Subsystems
   private Drive drive;
   private Vision vision;
   private final Superstructure superstructure;
   private RollerSystem funnel;
 
-  // Controller
+  // Controllers
   private final CommandXboxController driver = new CommandXboxController(0);
   private final CommandXboxController operator = new CommandXboxController(1);
   private final OverrideSwitches overrides = new OverrideSwitches(5);
   private final Trigger robotRelative = overrides.driverSwitch(0);
   private final Trigger superstructureDisable = overrides.driverSwitch(1);
   private final Trigger superstructureCoast = overrides.driverSwitch(2);
+  private final Trigger aprilTagsBlueReef = overrides.multiDirectionSwitchLeft();
+  private final Trigger aprilTagsRedReef = overrides.multiDirectionSwitchRight();
+  private final Alert aprilTagLayoutAlert = new Alert("", AlertType.kInfo);
   private final Alert driverDisconnected =
       new Alert("Driver controller disconnected (port 0).", AlertType.kWarning);
   private final Alert operatorDisconnected =
@@ -91,10 +92,11 @@ public class RobotContainer {
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[3]));
           vision =
               new Vision(
-                  new VisionIONorthstar(0),
-                  new VisionIONorthstar(1),
-                  new VisionIONorthstar(2),
-                  new VisionIONorthstar(3));
+                  this::getSelectedAprilTagLayout,
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 0),
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 1),
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 2),
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 3));
           elevator = new Elevator(new ElevatorIOTalonFX());
           dispenser =
               new Dispenser(
@@ -157,9 +159,13 @@ public class RobotContainer {
         case COMPBOT ->
             vision =
                 new Vision(
-                    new VisionIO() {}, new VisionIO() {}, new VisionIO() {}, new VisionIO() {});
-        case DEVBOT -> vision = new Vision(new VisionIO() {});
-        default -> vision = new Vision();
+                    this::getSelectedAprilTagLayout,
+                    new VisionIO() {},
+                    new VisionIO() {},
+                    new VisionIO() {},
+                    new VisionIO() {});
+        case DEVBOT -> vision = new Vision(this::getSelectedAprilTagLayout, new VisionIO() {});
+        default -> vision = new Vision(this::getSelectedAprilTagLayout);
       }
     }
     if (elevator == null) {
@@ -288,7 +294,8 @@ public class RobotContainer {
                 .withName("Scoring L4 Coral"));
   }
 
-  public void checkControllers() {
+  public void updateAlerts() {
+    // Controller disconnected alerts
     driverDisconnected.set(
         !DriverStation.isJoystickConnected(driver.getHID().getPort())
             || !DriverStation.getJoystickIsXbox(driver.getHID().getPort()));
@@ -296,6 +303,25 @@ public class RobotContainer {
         !DriverStation.isJoystickConnected(operator.getHID().getPort())
             || !DriverStation.getJoystickIsXbox(operator.getHID().getPort()));
     overrideDisconnected.set(!overrides.isConnected());
+
+    // AprilTag layout alert
+    boolean aprilTagAlertActive = getSelectedAprilTagLayout() != AprilTagLayoutType.OFFICIAL;
+    aprilTagLayoutAlert.set(aprilTagAlertActive);
+    if (aprilTagAlertActive) {
+      aprilTagLayoutAlert.setText(
+          "Non-official AprilTag layout in use (" + getSelectedAprilTagLayout().toString() + ").");
+    }
+  }
+
+  /** Returns the current AprilTag layout type. */
+  public AprilTagLayoutType getSelectedAprilTagLayout() {
+    if (aprilTagsBlueReef.getAsBoolean()) {
+      return FieldConstants.AprilTagLayoutType.BLUE_REEF;
+    } else if (aprilTagsRedReef.getAsBoolean()) {
+      return FieldConstants.AprilTagLayoutType.RED_REEF;
+    } else {
+      return FieldConstants.defaultAprilTagType;
+    }
   }
 
   /**

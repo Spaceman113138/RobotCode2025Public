@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 import lombok.Getter;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
-import org.littletonrobotics.frc2025.subsystems.vision.Vision;
+import org.littletonrobotics.frc2025.subsystems.vision.VisionConstants;
 import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -213,7 +213,7 @@ public class RobotState {
     tx /= 4.0;
     ty /= 4.0;
 
-    Pose3d cameraPose = Vision.cameraPoses[observation.camera()];
+    Pose3d cameraPose = VisionConstants.cameras[observation.camera()].pose().get();
 
     // Use 3D distance and tag angles to find robot pose
     Translation2d camToTagTranslation =
@@ -278,7 +278,7 @@ public class RobotState {
     }
     Pose2d fieldToRobot =
         estimatedPose.transformBy(new Transform2d(odometryPose, oldOdometryPose.get()));
-    Pose3d robotToCamera = Vision.cameraPoses[observation.camera()];
+    Pose3d robotToCamera = VisionConstants.cameras[observation.camera()].pose().get();
 
     // Average tx's and ty's
     double tx = 0.0;

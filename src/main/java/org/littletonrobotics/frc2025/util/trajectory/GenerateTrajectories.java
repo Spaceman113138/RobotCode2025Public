@@ -35,9 +35,9 @@ public class GenerateTrajectories {
             .setMoi(5.8)
             .setVehicleLength(DriveConstants.trackWidthX)
             .setVehicleWidth(DriveConstants.trackWidthY)
-            .setWheelRadius(Units.inchesToMeters(1.95225)) // TODO fix
+            .setWheelRadius(Units.inchesToMeters(2.0))
             .setMaxWheelTorque(3.0)
-            .setMaxWheelOmega(DriveConstants.maxLinearSpeed / Units.inchesToMeters(1.95225) * 0.75)
+            .setMaxWheelOmega(DriveConstants.maxLinearSpeed / Units.inchesToMeters(2.0) * 0.75)
             .build();
 
     // Connect to service

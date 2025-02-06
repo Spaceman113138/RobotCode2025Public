@@ -7,7 +7,6 @@
 
 package org.littletonrobotics.frc2025;
 
-import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -21,6 +20,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import org.littletonrobotics.frc2025.util.CanivoreReader;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
+import org.littletonrobotics.junction.AutoLogOutputManager;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
@@ -94,6 +94,9 @@ public class Robot extends LoggedRobot {
         break;
     }
 
+    // Set up auto logging for RobotState
+    AutoLogOutputManager.addObject(RobotState.getInstance());
+
     // Start AdvantageKit logger
     Logger.start();
 
@@ -155,7 +158,7 @@ public class Robot extends LoggedRobot {
     }
 
     // Robot container periodic methods
-    robotContainer.checkControllers();
+    robotContainer.updateAlerts();
 
     // Check CAN status
     var canStatus = RobotController.getCANStatus();

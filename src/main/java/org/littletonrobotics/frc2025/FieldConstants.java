@@ -179,12 +179,15 @@ public class FieldConstants {
   }
 
   public static final double aprilTagWidth = Units.inchesToMeters(6.50);
-  public static final AprilTagLayoutType defaultAprilTagType = AprilTagLayoutType.OFFICIAL;
   public static final int aprilTagCount = 22;
+  public static final AprilTagLayoutType defaultAprilTagType = AprilTagLayoutType.NO_BARGE;
 
   @Getter
   public enum AprilTagLayoutType {
-    OFFICIAL("2025-official");
+    OFFICIAL("2025-official"),
+    NO_BARGE("2025-no-barge"),
+    BLUE_REEF("2025-blue-reef"),
+    RED_REEF("2025-red-reef");
 
     AprilTagLayoutType(String name) {
       if (Constants.disableHAL) {

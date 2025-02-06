@@ -21,7 +21,6 @@ import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotation2d> pivotAngle) {
-  private static final double reversedHeightOffset = Units.inchesToMeters(7.0);
   private static final double algaeIntakeAngle = -105.0;
   private static final double groundToCarriageZero = dispenserOrigin2d.getY();
   private static final double tunnelEjectMeters = Units.inchesToMeters(12.0);

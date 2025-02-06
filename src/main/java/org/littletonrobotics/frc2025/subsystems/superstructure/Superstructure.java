@@ -23,6 +23,7 @@ import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
 import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState.State;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
@@ -286,9 +287,10 @@ public class Superstructure extends SubsystemBase {
 
     // E Stop Dispenser and Elevator if Necessary
     isEStopped =
-        isEStopped
-            || elevator.isShouldEStop()
-            || (dispenser.isShouldEStop() && Constants.getRobot() != RobotType.DEVBOT);
+        (isEStopped
+                || elevator.isShouldEStop()
+                || (dispenser.isShouldEStop() && Constants.getRobot() != RobotType.DEVBOT))
+            && Constants.getMode() != Mode.SIM;
     elevator.setEStopped(isEStopped);
     dispenser.setEStopped(isEStopped);
 

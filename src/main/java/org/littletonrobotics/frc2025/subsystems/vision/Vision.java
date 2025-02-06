@@ -7,22 +7,22 @@
 
 package org.littletonrobotics.frc2025.subsystems.vision;
 
-import edu.wpi.first.apriltag.AprilTagFieldLayout;
+import static org.littletonrobotics.frc2025.subsystems.vision.VisionConstants.*;
+
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.*;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
+import java.util.function.Supplier;
 import lombok.experimental.ExtensionMethod;
-import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.FieldConstants;
+import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.RobotState.AlgaeTxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.TxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.VisionObservation;
 import org.littletonrobotics.frc2025.util.GeomUtil;
-import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
@@ -30,68 +30,7 @@ import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 /** Vision subsystem for vision. */
 @ExtensionMethod({GeomUtil.class})
 public class Vision extends VirtualSubsystem {
-  public static final AprilTagFieldLayout fieldLayout =
-      FieldConstants.defaultAprilTagType.getLayout();
-  private static final double ambiguityThreshold = 0.4;
-  private static final double targetLogTimeSecs = 0.1;
-  private static final double fieldBorderMargin = 0.5;
-  private static final double zMargin = 0.75;
-  private static final double xyStdDevCoefficient = 0.005;
-  private static final double thetaStdDevCoefficient = 0.01;
-  private static final double demoTagPosePersistenceSecs = 0.5;
-  private static final double confidenceThreshold = 0.8;
-
-  public static final Pose3d[] cameraPoses =
-      switch (Constants.getRobot()) {
-        case COMPBOT ->
-            new Pose3d[] {
-              new Pose3d(
-                  Units.inchesToMeters(8.875),
-                  Units.inchesToMeters(10.5),
-                  Units.inchesToMeters(8.25),
-                  new Rotation3d(0.0, Units.degreesToRadians(-28.125), 0.0)
-                      .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(30.0)))),
-              new Pose3d(
-                  Units.inchesToMeters(3.25),
-                  Units.inchesToMeters(5.0),
-                  Units.inchesToMeters(6.4),
-                  new Rotation3d(0.0, Units.degreesToRadians(-16.875), 0.0)
-                      .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(-4.709)))),
-              new Pose3d(
-                  Units.inchesToMeters(8.875),
-                  Units.inchesToMeters(-10.5),
-                  Units.inchesToMeters(8.25),
-                  new Rotation3d(0.0, Units.degreesToRadians(-28.125), 0.0)
-                      .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(-30.0)))),
-              new Pose3d(
-                  Units.inchesToMeters(-16.0),
-                  Units.inchesToMeters(-12.0),
-                  Units.inchesToMeters(8.5),
-                  new Rotation3d(0.0, Units.degreesToRadians(-33.75), 0.0)
-                      .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(176.386))))
-            };
-        case DEVBOT ->
-            new Pose3d[] {
-              new Pose3d(
-                  Units.inchesToMeters(8.875),
-                  Units.inchesToMeters(10.5),
-                  Units.inchesToMeters(8.25),
-                  new Rotation3d(0.0, Units.degreesToRadians(-28.125), 0.0)
-                      .rotateBy(new Rotation3d(0.0, 0.0, Units.degreesToRadians(30.0))))
-            };
-        default -> new Pose3d[] {};
-      };
-
-  public static final double[] stdDevFactors =
-      switch (Constants.getRobot()) {
-        case COMPBOT -> new double[] {1.0, 0.6, 1.0, 1.2};
-        case DEVBOT -> new double[] {1.0, 1.0};
-        default -> new double[] {};
-      };
-
-  private static final LoggedTunableNumber timestampOffset =
-      new LoggedTunableNumber("AprilTagVision/TimestampOffset", -(1.0 / 50.0));
-
+  private final Supplier<AprilTagLayoutType> aprilTagLayoutSupplier;
   private final VisionIO[] io;
   private final AprilTagVisionIOInputsAutoLogged[] aprilTagInputs;
   private final ObjDetectVisionIOInputsAutoLogged[] objDetectInputs;
@@ -104,7 +43,8 @@ public class Vision extends VirtualSubsystem {
   private Pose3d demoTagPose = null;
   private double lastDemoTagPoseTimestamp = 0.0;
 
-  public Vision(VisionIO... io) {
+  public Vision(Supplier<AprilTagLayoutType> aprilTagLayoutSupplier, VisionIO... io) {
+    this.aprilTagLayoutSupplier = aprilTagLayoutSupplier;
     this.io = io;
     aprilTagInputs = new AprilTagVisionIOInputsAutoLogged[io.length];
     objDetectInputs = new ObjDetectVisionIOInputsAutoLogged[io.length];
@@ -169,7 +109,8 @@ public class Vision extends VirtualSubsystem {
                     values[4],
                     new Rotation3d(new Quaternion(values[5], values[6], values[7], values[8])));
             robotPose3d =
-                cameraPose.transformBy(cameraPoses[instanceIndex].toTransform3d().inverse());
+                cameraPose.transformBy(
+                    cameras[instanceIndex].pose().get().toTransform3d().inverse());
             useVisionRotation = true;
             break;
           case 2:
@@ -188,10 +129,10 @@ public class Vision extends VirtualSubsystem {
                     values[11],
                     values[12],
                     new Rotation3d(new Quaternion(values[13], values[14], values[15], values[16])));
-            Pose3d robotPose3d0 =
-                cameraPose0.transformBy(cameraPoses[instanceIndex].toTransform3d().inverse());
-            Pose3d robotPose3d1 =
-                cameraPose1.transformBy(cameraPoses[instanceIndex].toTransform3d().inverse());
+            Transform3d cameraToRobot =
+                cameras[instanceIndex].pose().get().toTransform3d().inverse();
+            Pose3d robotPose3d0 = cameraPose0.transformBy(cameraToRobot);
+            Pose3d robotPose3d1 = cameraPose1.transformBy(cameraToRobot);
 
             // Check for ambiguity and select based on estimated rotation
             if (error0 < error1 * ambiguityThreshold || error1 < error0 * ambiguityThreshold) {
@@ -233,7 +174,8 @@ public class Vision extends VirtualSubsystem {
         for (int i = (values[0] == 1 ? 9 : 17); i < values.length; i += 10) {
           int tagId = (int) values[i];
           lastTagDetectionTimes.put(tagId, Timer.getTimestamp());
-          Optional<Pose3d> tagPose = fieldLayout.getTagPose((int) values[i]);
+          Optional<Pose3d> tagPose =
+              aprilTagLayoutSupplier.get().getLayout().getTagPose((int) values[i]);
           tagPose.ifPresent(tagPoses::add);
         }
         if (tagPoses.isEmpty()) continue;
@@ -250,13 +192,13 @@ public class Vision extends VirtualSubsystem {
             xyStdDevCoefficient
                 * Math.pow(avgDistance, 2.0)
                 / tagPoses.size()
-                * stdDevFactors[instanceIndex];
+                * cameras[instanceIndex].stdDevFactor();
         double thetaStdDev =
             useVisionRotation
                 ? thetaStdDevCoefficient
                     * Math.pow(avgDistance, 2.0)
                     / tagPoses.size()
-                    * stdDevFactors[instanceIndex]
+                    * cameras[instanceIndex].stdDevFactor()
                 : Double.POSITIVE_INFINITY;
         allVisionObservations.add(
             new VisionObservation(
@@ -317,7 +259,7 @@ public class Vision extends VirtualSubsystem {
           frameIndex++) {
         double[] frame = objDetectInputs[instanceIndex].frames[frameIndex];
         for (int i = 0; i < frame.length; i += 10) {
-          if (frame[i + 1] > confidenceThreshold) {
+          if (frame[i + 1] > objDetectConfidenceThreshold) {
             double[] tx = new double[4];
             double[] ty = new double[4];
             for (int z = 0; z < 4; z++) {
@@ -338,7 +280,7 @@ public class Vision extends VirtualSubsystem {
         double error1 = values[8];
         Pose3d fieldToCameraPose =
             new Pose3d(RobotState.getInstance().getEstimatedPose())
-                .transformBy(cameraPoses[instanceIndex].toTransform3d());
+                .transformBy(cameras[instanceIndex].pose().get().toTransform3d());
         Pose3d fieldToTagPose0 =
             fieldToCameraPose.transformBy(
                 new Transform3d(
@@ -421,7 +363,11 @@ public class Vision extends VirtualSubsystem {
       List<Pose3d> allTagPoses = new ArrayList<>();
       for (Map.Entry<Integer, Double> detectionEntry : lastTagDetectionTimes.entrySet()) {
         if (Timer.getTimestamp() - detectionEntry.getValue() < targetLogTimeSecs) {
-          fieldLayout.getTagPose(detectionEntry.getKey()).ifPresent(allTagPoses::add);
+          aprilTagLayoutSupplier
+              .get()
+              .getLayout()
+              .getTagPose(detectionEntry.getKey())
+              .ifPresent(allTagPoses::add);
         }
       }
       Logger.recordOutput("AprilTagVision/TagPoses", allTagPoses.toArray(Pose3d[]::new));
