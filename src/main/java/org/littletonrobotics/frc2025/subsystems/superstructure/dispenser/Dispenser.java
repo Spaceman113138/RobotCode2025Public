@@ -29,17 +29,14 @@ import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOInputsAutoLogged;
-import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Dispenser {
-  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-140.0);
-  public static final Rotation2d maxAngle = Rotation2d.fromDegrees(160.0);
-  private static final double maxAngleRad = calculateFinalAngle(maxAngle).getRadians();
-  private static final double minAngleRad = calculateFinalAngle(minAngle).getRadians();
+  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-245.0);
+  public static final Rotation2d maxAngle = Rotation2d.fromDegrees(40.0);
 
   // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Dispenser/kP");
@@ -49,7 +46,7 @@ public class Dispenser {
   private static final LoggedTunableNumber maxVelocityDegPerSec =
       new LoggedTunableNumber("Dispenser/MaxVelocityDegreesPerSec", 500);
   private static final LoggedTunableNumber maxAccelerationDegPerSec2 =
-      new LoggedTunableNumber("Dispenser/MaxAccelerationDegreesPerSec2", 3000);
+      new LoggedTunableNumber("Dispenser/MaxAccelerationDegreesPerSec2", 2000);
   private static final LoggedTunableNumber staticCharacterizationVelocityThresh =
       new LoggedTunableNumber("Dispenser/StaticCharacterizationVelocityThresh", 0.1);
   private static final LoggedTunableNumber algaeIntakeCurrentThresh =
@@ -61,7 +58,7 @@ public class Dispenser {
   public static final LoggedTunableNumber tunnelDispenseVolts =
       new LoggedTunableNumber("Dispenser/TunnelDispenseVolts", 6.0);
   public static final LoggedTunableNumber tunnelIntakeVolts =
-      new LoggedTunableNumber("Dispenser/TunnelIntakeVolts", -6.0);
+      new LoggedTunableNumber("Dispenser/TunnelIntakeVolts", 6.0);
   public static final LoggedTunableNumber tolerance =
       new LoggedTunableNumber("Dispenser/Tolerance", .1);
 
@@ -69,7 +66,7 @@ public class Dispenser {
     switch (Constants.getRobot()) {
       case SIMBOT -> {
         kP.initDefault(4000);
-        kD.initDefault(2000);
+        kD.initDefault(1000);
         kS.initDefault(1.2);
         kG.initDefault(0.0);
       }
@@ -96,11 +93,6 @@ public class Dispenser {
 
   @AutoLogOutput(key = "Dispenser/PivotBrakeModeEnabled")
   private boolean brakeModeEnabled = true;
-
-  // Control
-  @Getter
-  @AutoLogOutput(key = "Dispenser/MeasuredAngle")
-  private Rotation2d finalAngle = new Rotation2d();
 
   private TrapezoidProfile profile;
   @Getter private State setpoint = new State();
@@ -180,9 +172,6 @@ public class Dispenser {
     // Set coast mode
     setBrakeMode(!coastOverride.getAsBoolean());
 
-    // Calculate combined angle
-    finalAngle = calculateFinalAngle(pivotInputs.internalPosition);
-
     // Run profile
     final boolean shouldRunProfile =
         !stopProfile
@@ -194,19 +183,22 @@ public class Dispenser {
 
     // Check if out of tolerance
     boolean outOfTolerance =
-        Math.abs(finalAngle.getRadians() - setpoint.position) > tolerance.get();
+        Math.abs(getPivotAngle().getRadians() - setpoint.position) > tolerance.get();
     shouldEStop =
         toleranceDebouncer.calculate(outOfTolerance && shouldRunProfile)
-            || finalAngle.getRadians() < minAngleRad
-            || finalAngle.getRadians() > maxAngleRad;
+            || getPivotAngle().getRadians() < minAngle.getRadians()
+            || getPivotAngle().getRadians() > maxAngle.getRadians();
     if (shouldRunProfile) {
       // Clamp goal
-      var goalState = new State(MathUtil.clamp(goal.getAsDouble(), minAngleRad, maxAngleRad), 0.0);
+      var goalState =
+          new State(
+              MathUtil.clamp(goal.getAsDouble(), minAngle.getRadians(), maxAngle.getRadians()),
+              0.0);
       setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
       pivotIO.runPosition(
-          Rotation2d.fromRadians(setpoint.position).plus(SuperstructureConstants.elevatorAngle),
+          Rotation2d.fromRadians(setpoint.position),
           kS.get() * Math.signum(setpoint.velocity) // Magnitude irrelevant
-              + kG.get() * finalAngle.getCos());
+              + kG.get() * getPivotAngle().getCos());
       // Check at goal
       atGoal =
           EqualsUtil.epsilonEquals(setpoint.position, goalState.position)
@@ -218,7 +210,7 @@ public class Dispenser {
       Logger.recordOutput("Dispenser/Profile/GoalPositionRad", goalState.position);
     } else {
       // Reset setpoint
-      setpoint = new State(finalAngle.getRadians(), 0.0);
+      setpoint = new State(getPivotAngle().getRadians(), 0.0);
 
       // Clear logs
       Logger.recordOutput("Dispenser/Profile/SetpointPositionRad", 0.0);
@@ -265,6 +257,10 @@ public class Dispenser {
     return hasAlgae;
   }
 
+  public Rotation2d getPivotAngle() {
+    return pivotInputs.internalPosition;
+  }
+
   public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
     this.coastOverride = coastOverride;
     this.disabledOverride = disabledOverride;
@@ -301,10 +297,5 @@ public class Dispenser {
 
   private static class StaticCharacterizationState {
     public double characterizationOutput = 0.0;
-  }
-
-  public static Rotation2d calculateFinalAngle(Rotation2d pivotAngle) {
-    return new Rotation2d(
-        pivotAngle.getRadians() - SuperstructureConstants.elevatorAngle.getRadians());
   }
 }

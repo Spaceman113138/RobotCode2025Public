@@ -20,7 +20,9 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
+import org.littletonrobotics.frc2025.commands.AutoScore;
 import org.littletonrobotics.frc2025.commands.DriveCommands;
 import org.littletonrobotics.frc2025.commands.DriveTrajectory;
 import org.littletonrobotics.frc2025.commands.IntakeCommands;
@@ -33,6 +35,8 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.*;
+import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.DispenserIO;
+import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.DispenserIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIO;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOSim;
@@ -43,9 +47,11 @@ import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.OverrideSwitches;
+import org.littletonrobotics.frc2025.util.TriggerUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 
+@ExtensionMethod({TriggerUtil.class})
 public class RobotContainer {
   // Subsystems
   private Drive drive;
@@ -118,10 +124,10 @@ public class RobotContainer {
           elevator = new Elevator(new ElevatorIOTalonFX());
           dispenser =
               new Dispenser(
-                  new DispenserIO() {}, new RollerSystemIOSpark(1, true), new RollerSystemIO() {});
+                  new DispenserIO() {}, new RollerSystemIOSpark(5, true), new RollerSystemIO() {});
           slam =
               new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false, 1.0));
-          funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(0, false));
+          funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(4, false));
         }
         case SIMBOT -> {
           drive =
@@ -256,42 +262,49 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
+    driver
+        .rightTrigger()
+        .whileTrue(
+            new AutoScore(
+                drive,
+                superstructure,
+                () -> new FieldConstants.CoralObjective(1, FieldConstants.ReefHeight.L4),
+                () -> -driver.getLeftY(),
+                () -> -driver.getLeftX(),
+                () -> -driver.getRightX()))
+        .onFalse(
+            superstructure
+                .runGoal(superstructure::getState)
+                .until(
+                    () -> {
+                      var robot =
+                          AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose());
+                      return robot.getTranslation().getDistance(FieldConstants.Reef.center)
+                          >= FieldConstants.Reef.faceLength
+                              + DriveConstants.robotWidth / 2.0
+                              + AutoScore.minDistanceReefClear.get();
+                    }));
+
     // Operator command for algae intake
     operator
         .leftBumper()
         .whileTrue(
             superstructure
-                .runGoal(SuperstructureState.State.ALGAE_FLOOR_INTAKE.getValue())
+                .runGoal(SuperstructureState.ALGAE_FLOOR_INTAKE)
                 .withName("Algae Floor Intake"));
 
     // Operator command for coral intake
     operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
 
     // Operator commands for superstructure
-    operator
-        .a()
-        .whileTrue(
-            superstructure
-                .runGoal(SuperstructureState.State.L1_CORAL.getValue())
-                .withName("Scoring L1 Coral"));
-    operator
-        .x()
-        .whileTrue(
-            superstructure
-                .runGoal(SuperstructureState.State.L2_CORAL.getValue())
-                .withName("Scoring L2 Coral"));
-    operator
-        .b()
-        .whileTrue(
-            superstructure
-                .runGoal(SuperstructureState.State.L3_CORAL.getValue())
-                .withName("Scoring L3 Coral"));
-    operator
-        .y()
-        .whileTrue(
-            superstructure
-                .runGoal(SuperstructureState.State.L4_CORAL.getValue())
-                .withName("Scoring L4 Coral"));
+    bindOperatorCoralCommand(
+        operator.a(), SuperstructureState.L1_CORAL, SuperstructureState.L1_CORAL_EJECT);
+    bindOperatorCoralCommand(
+        operator.x(), SuperstructureState.L2_CORAL, SuperstructureState.L2_CORAL_EJECT);
+    bindOperatorCoralCommand(
+        operator.b(), SuperstructureState.L3_CORAL, SuperstructureState.L3_CORAL_EJECT);
+    bindOperatorCoralCommand(
+        operator.y(), SuperstructureState.L4_CORAL, SuperstructureState.L4_CORAL_EJECT);
   }
 
   public void updateAlerts() {
@@ -322,6 +335,22 @@ public class RobotContainer {
     } else {
       return FieldConstants.defaultAprilTagType;
     }
+  }
+
+  private void bindOperatorCoralCommand(
+      Trigger faceButton,
+      SuperstructureState coralReadyState,
+      SuperstructureState coralEjectState) {
+    faceButton.whileTrueContinuous(
+        superstructure
+            .runGoal(coralReadyState)
+            .withName("Operator: " + coralReadyState.toString()));
+    faceButton
+        .and(operator.rightTrigger())
+        .whileTrueContinuous(
+            superstructure
+                .runGoal(coralEjectState)
+                .withName("Operator: " + coralEjectState.toString()));
   }
 
   /**

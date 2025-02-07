@@ -7,9 +7,7 @@
 
 package org.littletonrobotics.frc2025.util;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.geometry.Translation2d;
+import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.wpilibj.DriverStation;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.ModuleForce;
@@ -37,6 +35,19 @@ public class AllianceFlipUtil {
     return shouldFlip()
         ? new Pose2d(apply(pose.getTranslation()), apply(pose.getRotation()))
         : pose;
+  }
+
+  public static Translation3d apply(Translation3d translation) {
+    return new Translation3d(
+        applyX(translation.getX()), applyY(translation.getY()), translation.getZ());
+  }
+
+  public static Rotation3d apply(Rotation3d rotation) {
+    return shouldFlip() ? rotation.rotateBy(new Rotation3d(0.0, 0.0, Math.PI)) : rotation;
+  }
+
+  public static Pose3d apply(Pose3d pose) {
+    return new Pose3d(apply(pose.getTranslation()), apply(pose.getRotation()));
   }
 
   public static VehicleState apply(VehicleState state) {

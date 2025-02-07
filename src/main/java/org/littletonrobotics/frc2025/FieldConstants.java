@@ -15,10 +15,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Filesystem;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import lombok.Getter;
 
 /**
@@ -64,6 +61,7 @@ public class FieldConstants {
   }
 
   public static class Reef {
+    public static final double faceLength = Units.inchesToMeters(36.792600);
     public static final Translation2d center =
         new Translation2d(Units.inchesToMeters(176.746), Units.inchesToMeters(158.501));
     public static final double faceToZoneLine =
@@ -164,14 +162,21 @@ public class FieldConstants {
   }
 
   public enum ReefHeight {
-    L4(Units.inchesToMeters(72), -90),
-    L3(Units.inchesToMeters(47.625), -35),
+    L1(Units.inchesToMeters(18), 0),
     L2(Units.inchesToMeters(31.875), -35),
-    L1(Units.inchesToMeters(18), 0);
+    L3(Units.inchesToMeters(47.625), -35),
+    L4(Units.inchesToMeters(72), -90);
 
     ReefHeight(double height, double pitch) {
       this.height = height;
       this.pitch = pitch; // in degrees
+    }
+
+    public static ReefHeight fromLevel(int level) {
+      return Arrays.stream(values())
+          .filter(height -> height.ordinal() == level)
+          .findFirst()
+          .orElse(L4);
     }
 
     public final double height;
@@ -216,4 +221,6 @@ public class FieldConstants {
     private final AprilTagFieldLayout layout;
     private final String layoutString;
   }
+
+  public record CoralObjective(int branchId, ReefHeight reefLevel) {}
 }

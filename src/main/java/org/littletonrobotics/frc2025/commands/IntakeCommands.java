@@ -21,7 +21,7 @@ public class IntakeCommands {
 
   public static Command intake(Superstructure superstructure, RollerSystem funnel) {
     return superstructure
-        .runGoal(SuperstructureState.State.INTAKE.getValue())
+        .runGoal(SuperstructureState.INTAKE)
         .alongWith(
             Commands.waitUntil(superstructure::atGoal)
                 .andThen(funnel.runRoller(funnelVolts.get())));

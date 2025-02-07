@@ -16,6 +16,7 @@ import edu.wpi.first.wpilibj2.command.*;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,7 +26,7 @@ import org.jgrapht.graph.DefaultEdge;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.Constants.RobotType;
-import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState.State;
+import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
@@ -43,9 +44,9 @@ public class Superstructure extends SubsystemBase {
 
   private EdgeCommand edgeCommand;
 
-  private SuperstructureState state = State.START.getValue();
+  @Getter private SuperstructureState state = SuperstructureState.START;
   private SuperstructureState next = null;
-  private SuperstructureState goal = State.START.getValue();
+  private SuperstructureState goal = SuperstructureState.START;
 
   @AutoLogOutput(key = "Superstructure/EStopped")
   private boolean isEStopped = false;
@@ -74,15 +75,15 @@ public class Superstructure extends SubsystemBase {
         .onFalse(Commands.runOnce(() -> isEStopped = false).ignoringDisable(true));
 
     // Add states as vertices
-    for (var state : State.values()) {
-      graph.addVertex(state.getValue());
+    for (var state : SuperstructureState.values()) {
+      graph.addVertex(state);
     }
 
     // Populate edges
     // Add edge from start to stow
     graph.addEdge(
-        State.START.getValue(),
-        State.STOW.getValue(),
+        SuperstructureState.START,
+        SuperstructureState.STOW,
         EdgeCommand.builder()
             .command(
                 elevator
@@ -97,34 +98,34 @@ public class Superstructure extends SubsystemBase {
                     .andThen(
                         runSuperstructurePose(SuperstructurePose.Preset.STOW.getPose()),
                         Commands.waitUntil(this::isAtGoal),
-                        runSuperstructureExtras(SuperstructureState.State.STOW.getValue())))
+                        runSuperstructureExtras(SuperstructureState.STOW)))
             .build());
 
     final Set<SuperstructureState> freeNoAlgaeStates =
         Set.of(
-            State.STOW.getValue(),
-            State.INTAKE.getValue(),
-            State.L1_CORAL.getValue(),
-            State.L2_CORAL.getValue(),
-            State.L3_CORAL.getValue(),
-            State.L4_CORAL.getValue(),
-            State.ALGAE_FLOOR_INTAKE.getValue(),
-            State.ALGAE_L2_INTAKE.getValue(),
-            State.ALGAE_L3_INTAKE.getValue());
+            SuperstructureState.STOW,
+            SuperstructureState.INTAKE,
+            SuperstructureState.L1_CORAL,
+            SuperstructureState.L2_CORAL,
+            SuperstructureState.L3_CORAL,
+            SuperstructureState.L4_CORAL,
+            SuperstructureState.ALGAE_FLOOR_INTAKE,
+            SuperstructureState.ALGAE_L2_INTAKE,
+            SuperstructureState.ALGAE_L3_INTAKE);
 
     final Set<SuperstructureState> freeAlgaeStates =
         Set.of(
-            State.ALGAE_STOW_FRONT.getValue(),
-            State.L3_CORAL_UNREVERSED.getValue(),
-            State.L4_CORAL_UNREVERSED.getValue(),
-            State.ALGAE_L2_INTAKE.getValue(),
-            State.ALGAE_L3_INTAKE.getValue());
+            SuperstructureState.ALGAE_STOW_FRONT,
+            SuperstructureState.L3_CORAL_UNREVERSED,
+            SuperstructureState.L4_CORAL_UNREVERSED,
+            SuperstructureState.ALGAE_L2_INTAKE,
+            SuperstructureState.ALGAE_L3_INTAKE);
 
     final Set<SuperstructureState> algaeIntakeStates =
         Set.of(
-            State.ALGAE_FLOOR_INTAKE.getValue(),
-            State.ALGAE_L2_INTAKE.getValue(),
-            State.ALGAE_L3_INTAKE.getValue());
+            SuperstructureState.ALGAE_FLOOR_INTAKE,
+            SuperstructureState.ALGAE_L2_INTAKE,
+            SuperstructureState.ALGAE_L3_INTAKE);
 
     // Add all free edges
     for (var from : freeNoAlgaeStates) {
@@ -185,19 +186,23 @@ public class Superstructure extends SubsystemBase {
     // Add edges for paired states
     final Set<Pair<SuperstructureState, SuperstructureState>> pairedStates =
         Set.of(
-            new Pair<>(State.L1_CORAL.getValue(), State.L1_CORAL_EJECT.getValue()),
-            new Pair<>(State.L2_CORAL.getValue(), State.L2_CORAL_EJECT.getValue()),
-            new Pair<>(State.L3_CORAL.getValue(), State.L3_CORAL_EJECT.getValue()),
-            new Pair<>(State.L4_CORAL.getValue(), State.L4_CORAL_EJECT.getValue()),
+            new Pair<>(SuperstructureState.L1_CORAL, SuperstructureState.L1_CORAL_EJECT),
+            new Pair<>(SuperstructureState.L2_CORAL, SuperstructureState.L2_CORAL_EJECT),
+            new Pair<>(SuperstructureState.L3_CORAL, SuperstructureState.L3_CORAL_EJECT),
+            new Pair<>(SuperstructureState.L4_CORAL, SuperstructureState.L4_CORAL_EJECT),
+            new Pair<>(SuperstructureState.L1_CORAL_ALGAE, SuperstructureState.L1_CORAL_ALGAE),
             new Pair<>(
-                State.L3_CORAL_REVERSED.getValue(), State.L3_CORAL_REVERSED_EJECT.getValue()),
+                SuperstructureState.L3_CORAL_REVERSED, SuperstructureState.L3_CORAL_REVERSED_EJECT),
             new Pair<>(
-                State.L4_CORAL_REVERSED.getValue(), State.L4_CORAL_REVERSED_EJECT.getValue()),
-            new Pair<>(State.L3_CORAL_REVERSED.getValue(), State.L3_CORAL_UNREVERSED.getValue()),
-            new Pair<>(State.L4_CORAL_REVERSED.getValue(), State.L4_CORAL_UNREVERSED.getValue()),
-            new Pair<>(State.L3_CORAL_REVERSED.getValue(), State.L4_CORAL_REVERSED.getValue()),
-            new Pair<>(State.ALGAE_STOW.getValue(), State.ALGAE_STOW_FRONT.getValue()),
-            new Pair<>(State.ALGAE_STOW_FRONT.getValue(), State.PRE_PROCESSOR.getValue()));
+                SuperstructureState.L4_CORAL_REVERSED, SuperstructureState.L4_CORAL_REVERSED_EJECT),
+            new Pair<>(
+                SuperstructureState.L3_CORAL_REVERSED, SuperstructureState.L3_CORAL_UNREVERSED),
+            new Pair<>(
+                SuperstructureState.L4_CORAL_REVERSED, SuperstructureState.L4_CORAL_UNREVERSED),
+            new Pair<>(
+                SuperstructureState.L3_CORAL_REVERSED, SuperstructureState.L4_CORAL_REVERSED),
+            new Pair<>(SuperstructureState.ALGAE_STOW, SuperstructureState.ALGAE_STOW_FRONT),
+            new Pair<>(SuperstructureState.ALGAE_STOW_FRONT, SuperstructureState.PRE_PROCESSOR));
     for (var ejectPair : pairedStates) {
       addEdge.apply(ejectPair.getFirst(), ejectPair.getSecond(), false, AlgaeEdge.NONE, true);
     }
@@ -205,15 +210,15 @@ public class Superstructure extends SubsystemBase {
     // Add recoverable algae states
     for (var from :
         Set.of(
-            State.ALGAE_STOW.getValue(),
-            State.PRE_PROCESSOR.getValue(),
-            State.ALGAE_STOW_FRONT.getValue(),
-            State.L3_CORAL_UNREVERSED.getValue(),
-            State.L4_CORAL_UNREVERSED.getValue(),
-            State.L3_CORAL_REVERSED.getValue(),
-            State.L4_CORAL_REVERSED.getValue(),
-            State.L3_CORAL_REVERSED_EJECT.getValue(),
-            State.L4_CORAL_REVERSED_EJECT.getValue())) {
+            SuperstructureState.ALGAE_STOW,
+            SuperstructureState.PRE_PROCESSOR,
+            SuperstructureState.ALGAE_STOW_FRONT,
+            SuperstructureState.L3_CORAL_UNREVERSED,
+            SuperstructureState.L4_CORAL_UNREVERSED,
+            SuperstructureState.L3_CORAL_REVERSED,
+            SuperstructureState.L4_CORAL_REVERSED,
+            SuperstructureState.L3_CORAL_REVERSED_EJECT,
+            SuperstructureState.L4_CORAL_REVERSED_EJECT)) {
       for (var to : freeNoAlgaeStates) {
         graph.addEdge(
             from,
@@ -223,7 +228,8 @@ public class Superstructure extends SubsystemBase {
     }
 
     for (var from :
-        Set.of(State.PROCESSING.getValue(), State.THROWN.getValue(), State.TOSS.getValue())) {
+        Set.of(
+            SuperstructureState.PROCESSING, SuperstructureState.THROWN, SuperstructureState.TOSS)) {
       for (var to : freeNoAlgaeStates) {
         graph.addEdge(
             from,
@@ -234,27 +240,56 @@ public class Superstructure extends SubsystemBase {
 
     // Add miscellaneous edges
     addEdge.apply(
-        State.PRE_PROCESSOR.getValue(), State.PROCESSING.getValue(), true, AlgaeEdge.NONE, false);
+        SuperstructureState.PRE_PROCESSOR,
+        SuperstructureState.PROCESSING,
+        true,
+        AlgaeEdge.NONE,
+        false);
     addEdge.apply(
-        State.ALGAE_STOW_FRONT.getValue(), State.THROWN.getValue(), true, AlgaeEdge.NONE, false);
+        SuperstructureState.ALGAE_STOW_FRONT,
+        SuperstructureState.THROWN,
+        true,
+        AlgaeEdge.NONE,
+        false);
     addEdge.apply(
-        State.ALGAE_STOW_FRONT.getValue(), State.TOSS.getValue(), true, AlgaeEdge.NONE, false);
+        SuperstructureState.ALGAE_STOW_FRONT,
+        SuperstructureState.TOSS,
+        true,
+        AlgaeEdge.NONE,
+        false);
     addEdge.apply(
-        State.PROCESSING.getValue(), State.PRE_PROCESSOR.getValue(), false, AlgaeEdge.ALGAE, false);
+        SuperstructureState.PROCESSING,
+        SuperstructureState.PRE_PROCESSOR,
+        false,
+        AlgaeEdge.ALGAE,
+        false);
     addEdge.apply(
-        State.THROWN.getValue(), State.ALGAE_STOW_FRONT.getValue(), false, AlgaeEdge.ALGAE, false);
+        SuperstructureState.THROWN,
+        SuperstructureState.ALGAE_STOW_FRONT,
+        false,
+        AlgaeEdge.ALGAE,
+        false);
     addEdge.apply(
-        State.TOSS.getValue(), State.ALGAE_STOW_FRONT.getValue(), false, AlgaeEdge.ALGAE, false);
+        SuperstructureState.TOSS,
+        SuperstructureState.ALGAE_STOW_FRONT,
+        false,
+        AlgaeEdge.ALGAE,
+        false);
     addEdge.apply(
-        State.STOW.getValue(), State.ALGAE_STOW.getValue(), false, AlgaeEdge.ALGAE, false);
+        SuperstructureState.STOW, SuperstructureState.ALGAE_STOW, false, AlgaeEdge.ALGAE, false);
     addEdge.apply(
-        State.ALGAE_STOW.getValue(), State.STOW.getValue(), false, AlgaeEdge.NO_ALGAE, false);
+        SuperstructureState.ALGAE_STOW, SuperstructureState.STOW, false, AlgaeEdge.NO_ALGAE, false);
+    addEdge.apply(
+        SuperstructureState.L1_CORAL_ALGAE,
+        SuperstructureState.ALGAE_STOW,
+        false,
+        AlgaeEdge.NONE,
+        true);
 
     setDefaultCommand(
-        run(
+        runGoal(
             () ->
-                setGoal(
-                    dispenser.hasAlgae() ? State.ALGAE_STOW.getValue() : State.STOW.getValue())));
+                dispenser.hasAlgae() ? SuperstructureState.ALGAE_STOW : SuperstructureState.STOW));
   }
 
   @Override
@@ -298,18 +333,13 @@ public class Superstructure extends SubsystemBase {
     emergencyDisableAlert.set(isEStopped);
 
     // Log state
-    Logger.recordOutput(
-        "Superstructure/State", State.getPreset(state).map(State::toString).orElse(""));
-    Logger.recordOutput(
-        "Superstructure/Next", State.getPreset(next).map(State::toString).orElse(""));
-    Logger.recordOutput(
-        "Superstructure/Goal", State.getPreset(goal).map(State::toString).orElse(""));
+    Logger.recordOutput("Superstructure/State", state);
+    Logger.recordOutput("Superstructure/Next", next);
+    Logger.recordOutput("Superstructure/Goal", goal);
     if (edgeCommand != null) {
       Logger.recordOutput(
           "Superstructure/EdgeCommand",
-          State.getPreset(graph.getEdgeSource(edgeCommand)).map(State::toString).orElse("")
-              + " --> "
-              + State.getPreset(graph.getEdgeTarget(edgeCommand)).map(State::toString).orElse(""));
+          graph.getEdgeSource(edgeCommand) + " --> " + graph.getEdgeTarget(edgeCommand));
     } else {
       Logger.recordOutput("Superstructure/EdgeCommand", "");
     }
@@ -317,7 +347,7 @@ public class Superstructure extends SubsystemBase {
     // Update visualizer
     measuredVisualizer.update(
         elevator.getPositionMeters(),
-        dispenser.getFinalAngle(),
+        dispenser.getPivotAngle(),
         slam.isSlammed(),
         slam.isRetracting(),
         dispenser.hasAlgae());
@@ -338,6 +368,10 @@ public class Superstructure extends SubsystemBase {
   @AutoLogOutput(key = "Superstructure/AtGoal")
   public boolean atGoal() {
     return state == goal;
+  }
+
+  public boolean hasAlgae() {
+    return dispenser.hasAlgae();
   }
 
   private void setGoal(SuperstructureState goal) {
@@ -384,12 +418,12 @@ public class Superstructure extends SubsystemBase {
     return runOnce(() -> setGoal(goal)).andThen(Commands.idle(this));
   }
 
+  public Command runGoal(Supplier<SuperstructureState> goal) {
+    return run(() -> setGoal(goal.get()));
+  }
+
   private Optional<SuperstructureState> bfs(SuperstructureState start, SuperstructureState goal) {
-    System.out.println(
-        "bfs: Start "
-            + State.getPreset(start).toString()
-            + " to Goal "
-            + State.getPreset(goal).toString());
+    System.out.println("bfs: Start " + start.toString() + " to Goal " + goal.toString());
     // Map to track the parent of each visited node
     Map<SuperstructureState, SuperstructureState> parents = new HashMap<>();
     Queue<SuperstructureState> queue = new LinkedList<>();
@@ -399,7 +433,7 @@ public class Superstructure extends SubsystemBase {
     while (!queue.isEmpty()) {
       SuperstructureState current = queue.poll();
       // Check if we've reached the goal
-      if (current.equals(goal)) {
+      if (current == goal) {
         break;
       }
       // Process valid neighbors
@@ -441,7 +475,7 @@ public class Superstructure extends SubsystemBase {
    * subsystems are complete with profiles.
    */
   private EdgeCommand getEdgeCommand(SuperstructureState from, SuperstructureState to) {
-    if ((from == State.ALGAE_STOW_FRONT.getValue() && to == State.THROWN.getValue())) {
+    if ((from == SuperstructureState.ALGAE_STOW_FRONT && to == SuperstructureState.THROWN)) {
       // Algae Stow Front --> Thrown
       return EdgeCommand.builder()
           .command(
@@ -452,22 +486,24 @@ public class Superstructure extends SubsystemBase {
                                 new TrapezoidProfile.State(
                                     SuperstructureConstants.throwHeight.get(),
                                     SuperstructureConstants.throwVelocity.get()));
-                        dispenser.setGoal(to.getPose().pivotAngle());
+                        dispenser.setGoal(to.getValue().getPose().pivotAngle());
                       })
                   .andThen(
                       getSlamCommand(Goal.SLAM_DOWN),
                       Commands.waitUntil(this::isAtGoal),
-                      runSuperstructurePose(to.getPose()),
+                      runSuperstructurePose(to.getValue().getPose()),
                       runSuperstructureExtras(to),
                       Commands.waitUntil(this::isAtGoal)))
           .build();
-    } else if ((from == State.ALGAE_STOW_FRONT.getValue() && to == State.PRE_PROCESSOR.getValue())
-        || (from == State.PRE_PROCESSOR.getValue() && to == State.ALGAE_STOW_FRONT.getValue())) {
+    } else if ((from == SuperstructureState.ALGAE_STOW_FRONT
+            && to == SuperstructureState.PRE_PROCESSOR)
+        || (from == SuperstructureState.PRE_PROCESSOR
+            && to == SuperstructureState.ALGAE_STOW_FRONT)) {
       // Algae Stow Front <--> Pre-Processor
-      final boolean toProcessor = to == State.PRE_PROCESSOR.getValue();
+      final boolean toProcessor = to == SuperstructureState.PRE_PROCESSOR;
       return EdgeCommand.builder()
           .command(
-              runSuperstructurePose(to.getPose())
+              runSuperstructurePose(to.getValue().getPose())
                   .andThen(
                       getSlamCommand(toProcessor ? Goal.SLAM_UP : Goal.SLAM_DOWN),
                       Commands.runOnce(
@@ -481,18 +517,17 @@ public class Superstructure extends SubsystemBase {
                                   && (toProcessor == slam.isRetracting())))
                   .finallyDo(
                       () -> {
-                        slam.setGoal(to.getSlamGoal());
-                        slam.setIntakeVolts(to.getIntakeVolts().getAsDouble());
+                        slam.setGoal(to.getValue().getSlamGoal());
+                        slam.setIntakeVolts(to.getValue().getIntakeVolts().getAsDouble());
                       }))
           .build();
 
-    } else if (from.getHeight() != to.getHeight()) { // Account for different heights and reversing
+    } else if (from.getValue().getHeight()
+        != to.getValue().getHeight()) { // Account for different heights and reversing
       boolean shouldSlam =
-          from.getHeight() == SuperstructureState.Height.BOTTOM
-              || to.getHeight() == SuperstructureState.Height.BOTTOM
-              || from.getHeight() == SuperstructureState.Height.INTAKE
-              || to.getHeight() == SuperstructureState.Height.INTAKE;
-      boolean shouldPivotFirst = from.isReversed() || to.isReversed();
+          from.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE)
+              || to.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE);
+      boolean shouldPivotFirst = from.getValue().isReversed() || to.getValue().isReversed();
       if (shouldPivotFirst) {
         // Sequence with pivot movement
         return EdgeCommand.builder()
@@ -501,15 +536,15 @@ public class Superstructure extends SubsystemBase {
                     runSuperstructurePose(
                         new SuperstructurePose(
                             elevator::getPositionMeters,
-                            from.isReversed()
-                                ? to.getPose().pivotAngle()
-                                : from.getPose().pivotAngle())),
+                            from.getValue().isReversed()
+                                ? to.getValue().getPose().pivotAngle()
+                                : from.getValue().getPose().pivotAngle())),
                     Commands.waitUntil(this::isAtGoal),
-                    runSuperstructurePose(to.getPose())
+                    runSuperstructurePose(to.getValue().getPose())
                         .andThen(
                             shouldSlam
                                 ? getSlamCommand(Goal.SLAM_DOWN)
-                                : getSlamCommand(to.getSlamGoal()),
+                                : getSlamCommand(to.getValue().getSlamGoal()),
                             Commands.waitUntil(this::isAtGoal),
                             runSuperstructureExtras(to))))
             .build();
@@ -517,11 +552,11 @@ public class Superstructure extends SubsystemBase {
         // Only sequence with slam, ignore pivot
         return EdgeCommand.builder()
             .command(
-                runSuperstructurePose(to.getPose())
+                runSuperstructurePose(to.getValue().getPose())
                     .andThen(
                         shouldSlam
                             ? getSlamCommand(Goal.SLAM_DOWN)
-                            : getSlamCommand(to.getSlamGoal()),
+                            : getSlamCommand(to.getValue().getSlamGoal()),
                         Commands.waitUntil(this::isAtGoal),
                         runSuperstructureExtras(to)))
             .build();
@@ -530,7 +565,7 @@ public class Superstructure extends SubsystemBase {
       // Just run to next state if no restrictions
       return EdgeCommand.builder()
           .command(
-              runSuperstructurePose(to.getPose())
+              runSuperstructurePose(to.getValue().getPose())
                   .andThen(runSuperstructureExtras(to), Commands.waitUntil(this::isAtGoal)))
           .build();
     }
@@ -549,10 +584,10 @@ public class Superstructure extends SubsystemBase {
   private Command runSuperstructureExtras(SuperstructureState state) {
     return Commands.runOnce(
         () -> {
-          dispenser.setTunnelVolts(state.getTunnelVolts().getAsDouble());
-          dispenser.setGripperCurrent(state.getGripperCurrent().getAsDouble());
-          slam.setIntakeVolts(state.getIntakeVolts().getAsDouble());
-          slam.setGoal(state.getSlamGoal());
+          dispenser.setTunnelVolts(state.getValue().getTunnelVolts().getAsDouble());
+          dispenser.setGripperCurrent(state.getValue().getGripperCurrent().getAsDouble());
+          slam.setIntakeVolts(state.getValue().getIntakeVolts().getAsDouble());
+          slam.setGoal(state.getValue().getSlamGoal());
         });
   }
 
@@ -561,7 +596,7 @@ public class Superstructure extends SubsystemBase {
   }
 
   private boolean isEdgeAllowed(EdgeCommand edge, SuperstructureState goal) {
-    return (!edge.isRestricted() || goal.equals(graph.getEdgeTarget(edge)))
+    return (!edge.isRestricted() || goal == graph.getEdgeTarget(edge))
         && (edge.getAlgaeEdgeType() == AlgaeEdge.NONE
             || dispenser.hasAlgae() == (edge.getAlgaeEdgeType() == AlgaeEdge.ALGAE));
   }
@@ -569,6 +604,32 @@ public class Superstructure extends SubsystemBase {
   private boolean isAtGoal() {
     return elevator.isAtGoal()
         && (dispenser.isAtGoal() || Constants.getRobot() == RobotType.DEVBOT);
+  }
+
+  /** Get coral scoring state for level and algae state */
+  public static SuperstructureState getScoringState(
+      FieldConstants.ReefHeight height, boolean algae, boolean eject) {
+    return switch (height) {
+      case L1 ->
+          !algae
+              ? (eject ? SuperstructureState.L1_CORAL_EJECT : SuperstructureState.L1_CORAL)
+              : (eject
+                  ? SuperstructureState.L1_CORAL_ALGAE_EJECT
+                  : SuperstructureState.L1_CORAL_ALGAE);
+      case L2 -> eject ? SuperstructureState.L2_CORAL_EJECT : SuperstructureState.L2_CORAL;
+      case L3 ->
+          !algae
+              ? (eject ? SuperstructureState.L3_CORAL_EJECT : SuperstructureState.L3_CORAL)
+              : (eject
+                  ? SuperstructureState.L3_CORAL_REVERSED_EJECT
+                  : SuperstructureState.L3_CORAL_REVERSED);
+      case L4 ->
+          !algae
+              ? (eject ? SuperstructureState.L4_CORAL_EJECT : SuperstructureState.L4_CORAL)
+              : (eject
+                  ? SuperstructureState.L4_CORAL_REVERSED_EJECT
+                  : SuperstructureState.L4_CORAL_REVERSED);
+    };
   }
 
   /** All edge commands should finish and exit properly. */

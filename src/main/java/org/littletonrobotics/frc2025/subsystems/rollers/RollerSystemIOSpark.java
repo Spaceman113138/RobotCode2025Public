@@ -26,7 +26,7 @@ public class RollerSystemIOSpark implements RollerSystemIO {
   private final SparkBaseConfig config;
 
   private final Debouncer connectedDebouncer = new Debouncer(.5);
-  private int currentLimit = 30;
+  private int currentLimit = 60;
   private boolean brakeModeEnabled = true;
 
   public RollerSystemIOSpark(int deviceId, boolean isFlex) {

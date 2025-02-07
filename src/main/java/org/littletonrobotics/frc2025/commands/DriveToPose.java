@@ -16,11 +16,13 @@ import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.Command;
+import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Getter;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
+import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
@@ -88,6 +90,10 @@ public class DriveToPose extends Command {
   private double driveErrorAbs = 0.0;
   private double thetaErrorAbs = 0.0;
   @Getter private boolean running = false;
+  private Supplier<Pose2d> robot = RobotState.getInstance()::getEstimatedPose;
+
+  private Supplier<Translation2d> linearFF = () -> Translation2d.kZero;
+  private DoubleSupplier omegaFF = () -> 0.0;
 
   public DriveToPose(Drive drive, Supplier<Pose2d> target) {
     this.drive = drive;
@@ -99,9 +105,25 @@ public class DriveToPose extends Command {
     addRequirements(drive);
   }
 
+  public DriveToPose(Drive drive, Supplier<Pose2d> target, Supplier<Pose2d> robot) {
+    this(drive, target);
+    this.robot = robot;
+  }
+
+  public DriveToPose(
+      Drive drive,
+      Supplier<Pose2d> target,
+      Supplier<Pose2d> robot,
+      Supplier<Translation2d> linearFF,
+      DoubleSupplier omegaFF) {
+    this(drive, target, robot);
+    this.linearFF = linearFF;
+    this.omegaFF = omegaFF;
+  }
+
   @Override
   public void initialize() {
-    Pose2d currentPose = RobotState.getInstance().getEstimatedPose();
+    Pose2d currentPose = robot.get();
     ChassisSpeeds fieldVelocity = RobotState.getInstance().getFieldVelocity();
     Translation2d linearFieldVelocity =
         new Translation2d(fieldVelocity.vxMetersPerSecond, fieldVelocity.vyMetersPerSecond);
@@ -155,7 +177,7 @@ public class DriveToPose extends Command {
     }
 
     // Get current pose and target pose
-    Pose2d currentPose = RobotState.getInstance().getEstimatedPose();
+    Pose2d currentPose = robot.get();
     Pose2d targetPose = target.get();
 
     // Calculate drive speed
@@ -189,13 +211,23 @@ public class DriveToPose extends Command {
         Math.abs(currentPose.getRotation().minus(targetPose.getRotation()).getRadians());
     if (thetaErrorAbs < thetaController.getPositionTolerance()) thetaVelocity = 0.0;
 
-    // Command speeds
-    var driveVelocity =
+    Translation2d driveVelocity =
         new Pose2d(
                 new Translation2d(),
                 currentPose.getTranslation().minus(targetPose.getTranslation()).getAngle())
             .transformBy(GeomUtil.toTransform2d(driveVelocityScalar, 0.0))
             .getTranslation();
+
+    // Scale feedback velocities by input ff
+    final double linearS = linearFF.get().getNorm();
+    final double thetaS = omegaFF.getAsDouble();
+    driveVelocity =
+        driveVelocity.interpolate(linearFF.get().times(DriveConstants.maxLinearSpeed), linearS);
+    thetaVelocity =
+        MathUtil.interpolate(
+            thetaVelocity, omegaFF.getAsDouble() * DriveConstants.maxAngularSpeed, thetaS);
+
+    // Command speeds
     drive.runVelocity(
         ChassisSpeeds.fromFieldRelativeSpeeds(
             driveVelocity.getX(), driveVelocity.getY(), thetaVelocity, currentPose.getRotation()));

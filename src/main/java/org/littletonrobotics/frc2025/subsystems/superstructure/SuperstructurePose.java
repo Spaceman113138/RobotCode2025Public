@@ -132,6 +132,6 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
   }
 
   SuperstructurePose() {
-    this(() -> 0.0, Rotation2d::new);
+    this(() -> 0.0, () -> Rotation2d.kZero);
   }
 }

@@ -21,6 +21,10 @@ public class DriveConstants {
   public static final double maxLinearSpeed = 4.69;
   public static final double maxAngularSpeed = 4.69 / driveBaseRadius;
 
+  /** Includes bumpers! */
+  public static final double robotWidth =
+      Units.inchesToMeters(28.0) + 2 * Units.inchesToMeters(2.0);
+
   public static final Translation2d[] moduleTranslations = {
     new Translation2d(trackWidthX / 2, trackWidthY / 2),
     new Translation2d(trackWidthX / 2, -trackWidthY / 2),
@@ -77,8 +81,8 @@ public class DriveConstants {
     ModuleConfig.builder()
         .driveMotorId(12)
         .turnMotorId(9)
-        .encoderChannel(0)
-        .encoderOffset(Rotation2d.fromRadians(-1.1212842769317286))
+        .encoderChannel(1)
+        .encoderOffset(Rotation2d.fromRadians(-0.009115335014721037))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
@@ -86,8 +90,8 @@ public class DriveConstants {
     ModuleConfig.builder()
         .driveMotorId(2)
         .turnMotorId(10)
-        .encoderChannel(1)
-        .encoderOffset(Rotation2d.fromRadians(0.10517134259862208))
+        .encoderChannel(3)
+        .encoderOffset(Rotation2d.fromRadians(0.8427416931125384))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
@@ -95,8 +99,8 @@ public class DriveConstants {
     ModuleConfig.builder()
         .driveMotorId(15)
         .turnMotorId(11)
-        .encoderChannel(2)
-        .encoderOffset(Rotation2d.fromRadians(-2.61739604163251))
+        .encoderChannel(0)
+        .encoderOffset(Rotation2d.fromRadians(-1.0620197413817225))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
@@ -104,8 +108,8 @@ public class DriveConstants {
     ModuleConfig.builder()
         .driveMotorId(3)
         .turnMotorId(8)
-        .encoderChannel(3)
-        .encoderOffset(Rotation2d.fromRadians(0.8792257957300599))
+        .encoderChannel(2)
+        .encoderOffset(Rotation2d.fromRadians(-2.600063124240756))
         .turnInverted(true)
         .encoderInverted(false)
         .build()
