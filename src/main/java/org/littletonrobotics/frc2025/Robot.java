@@ -7,17 +7,20 @@
 
 package org.littletonrobotics.frc2025;
 
+import edu.wpi.first.hal.AllianceStationID;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Threads;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.simulation.DriverStationSim;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
+import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.util.CanivoreReader;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.AutoLogOutputManager;
@@ -126,6 +129,12 @@ public class Robot extends LoggedRobot {
 
     // Configure brownout voltage
     RobotController.setBrownoutVoltage(6.0);
+
+    // Configure DriverStation for sim
+    if (Constants.getRobot() == RobotType.SIMBOT) {
+      DriverStationSim.setAllianceStationId(AllianceStationID.Blue1);
+      DriverStationSim.notifyNewData();
+    }
 
     // Create RobotContainer
     robotContainer = new RobotContainer();

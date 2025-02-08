@@ -7,13 +7,16 @@
 
 package org.littletonrobotics.frc2025.commands;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import java.util.function.DoubleSupplier;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
+import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
 
@@ -23,7 +26,8 @@ public class DriveToAlgae extends DriveToPose {
   private static final LoggedTunableNumber angleDifferenceWeight =
       new LoggedTunableNumber("DriveToAlgae/AngleDifferenceWeight", 0.3);
 
-  public DriveToAlgae(Drive drive) {
+  public DriveToAlgae(
+      Drive drive, DoubleSupplier linearX, DoubleSupplier linearY, DoubleSupplier theta) {
     super(
         drive,
         () -> {
@@ -69,6 +73,15 @@ public class DriveToAlgae extends DriveToPose {
           Logger.recordOutput("DriveToAlgae/ClosestAlgae", closestAlgae);
 
           return closestAlgae;
-        });
+        },
+        RobotState.getInstance()::getEstimatedPose,
+        () ->
+            DriveCommands.getLinearVelocityFromJoysticks(
+                    linearX.getAsDouble(), linearY.getAsDouble())
+                .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
+        () ->
+            Math.copySign(
+                Math.pow(MathUtil.applyDeadband(theta.getAsDouble(), DriveCommands.DEADBAND), 2.0),
+                theta.getAsDouble()));
   }
 }

@@ -20,6 +20,7 @@ import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
+import java.util.function.BiConsumer;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
 import org.littletonrobotics.frc2025.commands.AutoScore;
@@ -297,14 +298,28 @@ public class RobotContainer {
     operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
 
     // Operator commands for superstructure
-    bindOperatorCoralCommand(
-        operator.a(), SuperstructureState.L1_CORAL, SuperstructureState.L1_CORAL_EJECT);
-    bindOperatorCoralCommand(
-        operator.x(), SuperstructureState.L2_CORAL, SuperstructureState.L2_CORAL_EJECT);
-    bindOperatorCoralCommand(
-        operator.b(), SuperstructureState.L3_CORAL, SuperstructureState.L3_CORAL_EJECT);
-    bindOperatorCoralCommand(
-        operator.y(), SuperstructureState.L4_CORAL, SuperstructureState.L4_CORAL_EJECT);
+    BiConsumer<Trigger, FieldConstants.ReefHeight> bindOperatorCoralScore =
+        (faceButton, height) -> {
+          faceButton.whileTrueContinuous(
+              superstructure
+                  .runGoal(
+                      () ->
+                          Superstructure.getScoringState(height, superstructure.hasAlgae(), false))
+                  .withName("Operator Score on " + height));
+          faceButton
+              .and(operator.rightTrigger())
+              .whileTrueContinuous(
+                  superstructure
+                      .runGoal(
+                          () ->
+                              Superstructure.getScoringState(
+                                  height, superstructure.hasAlgae(), true))
+                      .withName("Operator Score & Eject On " + height));
+        };
+    bindOperatorCoralScore.accept(operator.a(), FieldConstants.ReefHeight.L1);
+    bindOperatorCoralScore.accept(operator.x(), FieldConstants.ReefHeight.L2);
+    bindOperatorCoralScore.accept(operator.b(), FieldConstants.ReefHeight.L3);
+    bindOperatorCoralScore.accept(operator.y(), FieldConstants.ReefHeight.L4);
   }
 
   public void updateAlerts() {
@@ -335,22 +350,6 @@ public class RobotContainer {
     } else {
       return FieldConstants.defaultAprilTagType;
     }
-  }
-
-  private void bindOperatorCoralCommand(
-      Trigger faceButton,
-      SuperstructureState coralReadyState,
-      SuperstructureState coralEjectState) {
-    faceButton.whileTrueContinuous(
-        superstructure
-            .runGoal(coralReadyState)
-            .withName("Operator: " + coralReadyState.toString()));
-    faceButton
-        .and(operator.rightTrigger())
-        .whileTrueContinuous(
-            superstructure
-                .runGoal(coralEjectState)
-                .withName("Operator: " + coralEjectState.toString()));
   }
 
   /**

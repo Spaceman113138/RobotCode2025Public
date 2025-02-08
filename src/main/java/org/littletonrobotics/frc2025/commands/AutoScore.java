@@ -10,6 +10,7 @@ package org.littletonrobotics.frc2025.commands;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
@@ -48,6 +49,11 @@ public class AutoScore extends SequentialCommandGroup {
       new LoggedTunableNumber("AutoScore/LinearToleranceEject", 0.05);
   private static final LoggedTunableNumber thetaToleranceEject =
       new LoggedTunableNumber("AutoScore/ThetaToleranceEject", 2.0);
+  private static final LoggedTunableNumber horizontalL1MaxOffset =
+      new LoggedTunableNumber(
+          "AutoScore/HorizontalL1MaxOffset", Reef.faceLength / 2 - Units.inchesToMeters(4));
+  private static final LoggedTunableNumber verticalL1AlignDistance =
+      new LoggedTunableNumber("AutoScore/Vertical1AlignDistance", 0.5);
 
   private final Superstructure superstructure;
   private final Supplier<CoralObjective> coralObjective;
@@ -133,7 +139,8 @@ public class AutoScore extends SequentialCommandGroup {
   /** Get drive target. */
   private Pose2d getDriveTarget() {
     // Get pose of robot aligned to reef
-    Pose2d reefAlignedPose = getAlignedPose(coralObjective.get(), superstructure.hasAlgae());
+    final Pose2d robot = AllianceFlipUtil.apply(getRobotPose());
+    Pose2d reefAlignedPose = getAlignedPose(robot, coralObjective.get(), superstructure.hasAlgae());
     // If superstructure isn't ready move back away from reef
     if (superstructure.hasAlgae()
         && !superstructure.getState().getValue().isReversed()
@@ -143,7 +150,6 @@ public class AutoScore extends SequentialCommandGroup {
     }
 
     // Flip pose for field constants
-    final Pose2d robot = AllianceFlipUtil.apply(getRobotPose());
     final double distance = robot.getTranslation().getDistance(reefAlignedPose.getTranslation());
     // Flip back to correct alliance
     // Final line up
@@ -180,16 +186,18 @@ public class AutoScore extends SequentialCommandGroup {
    * close.
    */
   private Pose2d getRobotPose() {
-    final Pose2d finalPose = getAlignedPose(coralObjective.get(), superstructure.hasAlgae());
+    final Pose2d finalPose =
+        getAlignedPose(
+            AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose()),
+            coralObjective.get(),
+            superstructure.hasAlgae());
     var tagPose = RobotState.getInstance().getTxTyPose(getTagID());
     // Use estimated pose if tag pose is not present
     if (tagPose.isEmpty()) return RobotState.getInstance().getEstimatedPose();
     // Use distance from estimated pose to final pose to get t value
     final double t =
         MathUtil.clamp(
-            (RobotState.getInstance()
-                        .getEstimatedPose()
-                        .getTranslation()
+            (AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose().getTranslation())
                         .getDistance(finalPose.getTranslation())
                     - minDistanceTagPoseBlend.get())
                 / (maxDistanceTagPoseBlend.get() - minDistanceTagPoseBlend.get()),
@@ -199,7 +207,20 @@ public class AutoScore extends SequentialCommandGroup {
   }
 
   /** Get position of robot aligned with branch for selected objective. */
-  public static Pose2d getAlignedPose(CoralObjective coralObjective, boolean algae) {
+  public static Pose2d getAlignedPose(
+      Pose2d curPose, CoralObjective coralObjective, boolean algae) {
+    if (coralObjective.reefLevel() == FieldConstants.ReefHeight.L1) {
+      int face = coralObjective.branchId() / 2;
+      Transform2d offset = new Transform2d(Reef.centerFaces[face], curPose);
+      offset =
+          new Transform2d(
+              verticalL1AlignDistance.get(),
+              MathUtil.clamp(
+                  offset.getY(), -horizontalL1MaxOffset.get(), horizontalL1MaxOffset.get()),
+              new Rotation2d(Math.PI));
+      return Reef.centerFaces[face].transformBy(offset);
+    }
+
     var dispenserPose = getDispenserPose(coralObjective, algae);
     return Reef.branchPositions
         .get(coralObjective.branchId())
