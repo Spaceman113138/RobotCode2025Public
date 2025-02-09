@@ -21,7 +21,9 @@ import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator
 
 public class DispenserIOSim implements DispenserIO {
   public static final double moi =
-      (0.5) * (ElevatorIOSim.carriageMassKg) * Math.pow(SuperstructureConstants.pivotLength, 2.0);
+      (0.5)
+          * (ElevatorIOSim.carriageMassKg)
+          * Math.pow(SuperstructureConstants.pivotToTunnelFront, 2.0);
   private static final double cgRadius = Units.inchesToMeters(10.0);
   public static final DCMotor gearbox =
       DCMotor.getKrakenX60Foc(1).withReduction(DispenserIOTalonFX.reduction);

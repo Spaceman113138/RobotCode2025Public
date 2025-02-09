@@ -264,12 +264,12 @@ public class RobotContainer {
                 .ignoringDisable(true));
 
     driver
-        .rightTrigger()
+        .a()
         .whileTrue(
             new AutoScore(
                 drive,
                 superstructure,
-                () -> new FieldConstants.CoralObjective(1, FieldConstants.ReefHeight.L4),
+                () -> new FieldConstants.CoralObjective(0, FieldConstants.ReefHeight.L3),
                 () -> -driver.getLeftY(),
                 () -> -driver.getLeftX(),
                 () -> -driver.getRightX()))
@@ -285,6 +285,8 @@ public class RobotContainer {
                               + DriveConstants.robotWidth / 2.0
                               + AutoScore.minDistanceReefClear.get();
                     }));
+    driver.x().whileTrue(superstructure.runGoal(SuperstructureState.THROWN));
+    driver.y().whileTrue(superstructure.runGoal(SuperstructureState.PROCESSING));
 
     // Operator command for algae intake
     operator

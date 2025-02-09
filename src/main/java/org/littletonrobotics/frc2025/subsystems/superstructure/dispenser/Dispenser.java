@@ -35,7 +35,7 @@ import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
 public class Dispenser {
-  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-245.0);
+  public static final Rotation2d minAngle = Rotation2d.fromDegrees(-240.0);
   public static final Rotation2d maxAngle = Rotation2d.fromDegrees(40.0);
 
   // Tunable numbers

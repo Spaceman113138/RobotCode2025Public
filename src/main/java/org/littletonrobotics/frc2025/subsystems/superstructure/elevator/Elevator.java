@@ -100,6 +100,8 @@ public class Elevator {
   @AutoLogOutput(key = "Elevator/Profile/AtGoal")
   private boolean atGoal = false;
 
+  @Setter private boolean stowed = false;
+
   public Elevator(ElevatorIO io) {
     this.io = io;
 
@@ -164,6 +166,11 @@ public class Elevator {
       atGoal =
           EqualsUtil.epsilonEquals(setpoint.position, goalState.position)
               && EqualsUtil.epsilonEquals(setpoint.velocity, goalState.velocity);
+
+      // Stop running elevator down when in stow
+      if (stowed && atGoal) {
+        io.stop();
+      }
 
       // Log state
       Logger.recordOutput("Elevator/Profile/SetpointPositionMeters", setpoint.position);

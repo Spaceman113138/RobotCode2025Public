@@ -7,11 +7,13 @@
 
 package org.littletonrobotics.frc2025.subsystems.superstructure;
 
+import edu.wpi.first.math.geometry.Rotation2d;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureStateData.Height;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
+import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam.Goal;
 
 @Getter
 @RequiredArgsConstructor
@@ -73,40 +75,51 @@ public enum SuperstructureState {
       SuperstructureStateData.builder()
           .pose(SuperstructurePose.Preset.ALGAE_STOW.getPose())
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
-          .slamGoal(Slam.Goal.SLAM_UP)
-          .height(Height.BOTTOM)
-          .build()),
-  ALGAE_STOW_FRONT(
-      SuperstructureStateData.builder()
-          .pose(SuperstructurePose.Preset.ALGAE_STOW_FRONT.getPose())
-          .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .slamGoal(Slam.Goal.SLAM_DOWN)
           .height(Height.INTAKE)
           .build()),
   TOSS(
-      ALGAE_STOW_FRONT.getValue().toBuilder()
+      SuperstructureStateData.builder()
+          .pose(
+              new SuperstructurePose(
+                  SuperstructurePose.Preset.ALGAE_STOW.getPose().elevatorHeight(),
+                  () -> Rotation2d.fromDegrees(30.0)))
+          .slamGoal(Goal.SLAM_UP)
+          .height(Height.INTAKE)
           .gripperCurrent(Dispenser.gripperDispenseCurrent)
           .build()),
   PRE_PROCESSOR(
       SuperstructureStateData.builder()
           .pose(SuperstructurePose.Preset.PRE_PROCESSOR.getPose())
+          .slamGoal(Goal.SLAM_UP)
+          .intakeVolts(Slam.occupiedVolts)
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .build()),
   PROCESSING(
       PRE_PROCESSOR.getValue().toBuilder()
           .gripperCurrent(Dispenser.gripperDispenseCurrent)
-          .intakeVolts(Slam.processorVolts)
+          .intakeVolts(() -> 0.0)
           .build()),
-  L1_CORAL_ALGAE(
-      L1_CORAL.getValue().toBuilder().gripperCurrent(Dispenser.gripperIntakeCurrent).build()),
-  L1_CORAL_ALGAE_EJECT(
-      L1_CORAL_EJECT.getValue().toBuilder().gripperCurrent(Dispenser.gripperIntakeCurrent).build()),
+  L1_CORAL_REVERSED(
+      SuperstructureStateData.builder()
+          .pose(SuperstructurePose.Preset.L1_CORAL_REVERSED.getPose())
+          .reversed(true)
+          .gripperCurrent(Dispenser.gripperIntakeCurrent)
+          .height(Height.FIRST_STAGE)
+          .build()),
+  L2_CORAL_REVERSED(
+      SuperstructureStateData.builder()
+          .pose(SuperstructurePose.Preset.L2_CORAL_REVERSED.getPose())
+          .reversed(true)
+          .gripperCurrent(Dispenser.gripperIntakeCurrent)
+          .height(Height.FIRST_STAGE)
+          .build()),
   L3_CORAL_REVERSED(
       SuperstructureStateData.builder()
           .pose(SuperstructurePose.Preset.L3_CORAL_REVERSED.getPose())
           .reversed(true)
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
-          .height(Height.SECOND_STAGE)
+          .height(Height.FIRST_STAGE)
           .build()),
   L4_CORAL_REVERSED(
       SuperstructureStateData.builder()
@@ -115,20 +128,20 @@ public enum SuperstructureState {
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .height(Height.SECOND_STAGE)
           .build()),
-  L3_CORAL_UNREVERSED(
-      L3_CORAL_REVERSED.getValue().toBuilder()
-          .pose(SuperstructurePose.Preset.L3_CORAL_UNREVERSED.getPose())
-          .reversed(false)
-          .build()),
-  L4_CORAL_UNREVERSED(
-      L4_CORAL_REVERSED.getValue().toBuilder()
-          .pose(SuperstructurePose.Preset.L4_CORAL_UNREVERSED.getPose())
-          .reversed(false)
-          .build()),
+  L1_CORAL_REVERSED_EJECT(
+      L1_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build()),
+  L2_CORAL_REVERSED_EJECT(
+      L2_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build()),
   L3_CORAL_REVERSED_EJECT(
       L3_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build()),
   L4_CORAL_REVERSED_EJECT(
-      L4_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build());
+      L4_CORAL_REVERSED.getValue().toBuilder().tunnelVolts(Dispenser.tunnelIntakeVolts).build()),
+  UNREVERSED(
+      SuperstructureStateData.builder()
+          .pose(new SuperstructurePose(() -> 0.0, () -> SuperstructureConstants.pivotSafeAngle))
+          .gripperCurrent(Dispenser.gripperIntakeCurrent)
+          .height(Height.SECOND_STAGE) // Always above second stage
+          .build());
 
   private final SuperstructureStateData value;
 }

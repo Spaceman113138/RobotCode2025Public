@@ -13,6 +13,7 @@ import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.util.Color8Bit;
+import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
@@ -70,15 +71,14 @@ public class SuperstructureVisualizer {
     Logger.recordOutput("Mechanism2d/" + name, mechanism);
 
     // Max of top of carriage or starting height
-    final double heightFromBottom =
-        elevatorHeightMeters + stageThickness * 2.0 + dispenserToCarriage;
+    final double heightFromBottom = elevatorHeightMeters + bottomToDispenser + stageThickness * 2.0;
     final double firstStageHeight =
         Math.max(
-            heightFromBottom + dispenserToCarriage - stageHeight - (stageThickness / 2.0),
+            heightFromBottom - stageHeight + bottomToDispenser - (stageThickness / 2.0),
             stageThickness * (3.0 / 2.0));
     final double secondStageHeight =
         Math.max(
-            firstStageHeight - (stageThickness / 2.0) - stageHeight + stageToStage,
+            firstStageHeight - stageHeight + stageToStage - (stageThickness / 2.0),
             stageThickness * (1.0 / 2.0) + stageToStageOffset);
 
     Pose3d pivotPose3d =
@@ -89,18 +89,16 @@ public class SuperstructureVisualizer {
             new Rotation3d(
                 0.0,
                 // Have to invert angle due to CAD??
-                Rotation2d.kPi.minus(pivotFinalAngle).plus(elevatorAngle).getRadians(),
+                -pivotFinalAngle.getRadians(),
                 0.0));
 
     Logger.recordOutput(
         "Mechanism3d/" + name + "/Elevator",
-        // Outer Stage
         new Pose3d(
             superstructureOrigin3d.plus(
                 new Translation3d(
                     secondStageHeight, new Rotation3d(0.0, -elevatorAngle.getRadians(), 0.0))),
             new Rotation3d()),
-        // Carriage always at top of inner stage
         new Pose3d(
             superstructureOrigin3d.plus(
                 new Translation3d(
@@ -128,7 +126,10 @@ public class SuperstructureVisualizer {
               .transformBy(new Transform3d(Pose3d.kZero, pivotPose3d))
               .transformBy(
                   new Transform3d(
-                      pivotToGripper + Units.inchesToMeters(4.0), 0.0, -0.1, Rotation3d.kZero))
+                      pivotToGripper + FieldConstants.algaeDiameter / 2.0,
+                      0.0,
+                      0.0,
+                      Rotation3d.kZero))
               .getTranslation());
     } else {
       Logger.recordOutput("Mechanism3d/" + name + "/Algae", new Translation3d[] {});
