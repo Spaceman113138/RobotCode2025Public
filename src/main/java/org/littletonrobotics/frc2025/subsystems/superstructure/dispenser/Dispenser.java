@@ -241,12 +241,9 @@ public class Dispenser {
   }
 
   public void setGoal(Supplier<Rotation2d> goal) {
-    setGoal(() -> goal.get().getRadians());
-  }
-
-  public void setGoal(DoubleSupplier goal) {
+    this.goal =
+        () -> MathUtil.inputModulus(goal.get().getRadians(), -3.0 * Math.PI / 2.0, Math.PI / 2.0);
     atGoal = false;
-    this.goal = goal;
   }
 
   public double getGoal() {

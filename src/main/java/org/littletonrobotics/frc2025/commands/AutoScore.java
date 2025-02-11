@@ -42,10 +42,6 @@ public class AutoScore extends SequentialCommandGroup {
   private static final LoggedTunableNumber maxDistanceSuperstructurePreScore =
       new LoggedTunableNumber(
           "AutoScore/MaxDistanceSuperstructurePreScore", Units.inchesToMeters(36.0));
-  private static final LoggedTunableNumber minDistanceTagPoseBlend =
-      new LoggedTunableNumber("AutoScore/MinDistanceTagPoseBlend", Units.inchesToMeters(24.0));
-  private static final LoggedTunableNumber maxDistanceTagPoseBlend =
-      new LoggedTunableNumber("AutoScore/MaxDistanceTagPoseBlend", Units.inchesToMeters(36.0));
   private static final LoggedTunableNumber linearToleranceEject =
       new LoggedTunableNumber("AutoScore/LinearToleranceEject", 0.05);
   private static final LoggedTunableNumber thetaToleranceEject =
@@ -177,7 +173,7 @@ public class AutoScore extends SequentialCommandGroup {
     // If superstructure isn't ready move back away from reef
     if (superstructure.hasAlgae()
         && !superstructure.getState().getValue().isReversed()
-        && !(coralObjective.get().reefLevel() == FieldConstants.ReefHeight.L1)) {
+        && !(coralObjective.get().reefLevel() == FieldConstants.ReefLevel.L1)) {
       reefAlignedPose =
           reefAlignedPose.transformBy(GeomUtil.toTransform2d(-minDistanceReefClear.get(), 0.0));
     }
@@ -211,40 +207,14 @@ public class AutoScore extends SequentialCommandGroup {
     Logger.recordOutput("AutoScore/WithinMinDistance", withinMinDistance);
     return (withinMaxDistance && withinMinDistance)
         || ((superstructure.hasAlgae() && superstructure.getState().getValue().isReversed())
-            || (coralObjective.get().reefLevel() == FieldConstants.ReefHeight.L1));
-  }
-
-  /**
-   * Get robot pose based on how far away from associated tag we are. Uses 2d estimation data when
-   * close.
-   */
-  private Pose2d getRobotPose() {
-    final Pose2d finalPose =
-        getAlignedPose(
-            AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose()),
-            coralObjective.get(),
-            superstructure.hasAlgae());
-    var tagPose = RobotState.getInstance().getTxTyPose(getTagID());
-    // Use estimated pose if tag pose is not present
-    if (tagPose.isEmpty()) return RobotState.getInstance().getEstimatedPose();
-    // Use distance from estimated pose to final pose to get t value
-    final double t =
-        MathUtil.clamp(
-            (AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose().getTranslation())
-                        .getDistance(finalPose.getTranslation())
-                    - minDistanceTagPoseBlend.get())
-                / (maxDistanceTagPoseBlend.get() - minDistanceTagPoseBlend.get()),
-            0.0,
-            1.0);
-    return RobotState.getInstance().getEstimatedPose().interpolate(tagPose.get(), 1.0 - t);
+            || (coralObjective.get().reefLevel() == FieldConstants.ReefLevel.L1));
   }
 
   /** Get position of robot aligned with branch for selected objective. */
-  public static Pose2d getAlignedPose(
-      Pose2d curPose, CoralObjective coralObjective, boolean algae) {
-    if (coralObjective.reefLevel() == FieldConstants.ReefHeight.L1) {
+  public static Pose2d getAlignedPose(Pose2d robot, CoralObjective coralObjective, boolean algae) {
+    if (coralObjective.reefLevel() == FieldConstants.ReefLevel.L1) {
       int face = coralObjective.branchId() / 2;
-      Transform2d offset = new Transform2d(Reef.centerFaces[face], curPose);
+      Transform2d offset = new Transform2d(Reef.centerFaces[face], robot);
       offset =
           new Transform2d(
               verticalL1AlignDistance.get(),
@@ -279,6 +249,16 @@ public class AutoScore extends SequentialCommandGroup {
       case L4 ->
           algae ? SuperstructurePose.DispenserPose.L4_ALGAE : SuperstructurePose.DispenserPose.L4;
     };
+  }
+
+  private Pose2d getRobotPose() {
+    return RobotState.getInstance()
+        .getReefPose(
+            getTagID(),
+            getAlignedPose(
+                RobotState.getInstance().getEstimatedPose(),
+                coralObjective.get(),
+                superstructure.hasAlgae()));
   }
 
   private int getTagID() {

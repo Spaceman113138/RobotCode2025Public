@@ -106,7 +106,6 @@ public class Superstructure extends SubsystemBase {
     final Set<SuperstructureState> freeNoAlgaeStates =
         Set.of(
             SuperstructureState.STOW,
-            SuperstructureState.INTAKE,
             SuperstructureState.L1_CORAL,
             SuperstructureState.L2_CORAL,
             SuperstructureState.L3_CORAL,
@@ -187,6 +186,7 @@ public class Superstructure extends SubsystemBase {
     // Add edges for paired states
     final Set<Pair<SuperstructureState, SuperstructureState>> pairedStates =
         Set.of(
+            new Pair<>(SuperstructureState.STOW, SuperstructureState.INTAKE),
             new Pair<>(SuperstructureState.L1_CORAL, SuperstructureState.L1_CORAL_EJECT),
             new Pair<>(SuperstructureState.L2_CORAL, SuperstructureState.L2_CORAL_EJECT),
             new Pair<>(SuperstructureState.L3_CORAL, SuperstructureState.L3_CORAL_EJECT),
@@ -584,7 +584,6 @@ public class Superstructure extends SubsystemBase {
           dispenser.setTunnelVolts(state.getValue().getTunnelVolts().getAsDouble());
           dispenser.setGripperCurrent(state.getValue().getGripperCurrent().getAsDouble());
           slam.setIntakeVolts(state.getValue().getIntakeVolts().getAsDouble());
-          slam.setGoal(state.getValue().getSlamGoal());
         });
   }
 
@@ -605,7 +604,7 @@ public class Superstructure extends SubsystemBase {
 
   /** Get coral scoring state for level and algae state */
   public static SuperstructureState getScoringState(
-      FieldConstants.ReefHeight height, boolean algae, boolean eject) {
+      FieldConstants.ReefLevel height, boolean algae, boolean eject) {
     return switch (height) {
       case L1 ->
           !algae

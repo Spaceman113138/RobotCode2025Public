@@ -32,7 +32,8 @@ public class SlamIOTalonFX implements SlamIO {
   private final StatusSignal<Angle> position;
   private final StatusSignal<AngularVelocity> velocity;
   private final StatusSignal<Voltage> appliedVolts;
-  private final StatusSignal<Current> current;
+  private final StatusSignal<Current> supplyCurrentAmps;
+  private final StatusSignal<Current> torqueCurrentAmps;
   private final StatusSignal<Temperature> temp;
 
   // Control Requests
@@ -58,10 +59,12 @@ public class SlamIOTalonFX implements SlamIO {
     position = talon.getPosition();
     velocity = talon.getVelocity();
     appliedVolts = talon.getMotorVoltage();
-    current = talon.getStatorCurrent();
+    supplyCurrentAmps = talon.getSupplyCurrent();
+    torqueCurrentAmps = talon.getTorqueCurrent();
     temp = talon.getDeviceTemp();
 
-    BaseStatusSignal.setUpdateFrequencyForAll(50.0, position, velocity, appliedVolts, current);
+    BaseStatusSignal.setUpdateFrequencyForAll(
+        50.0, position, velocity, appliedVolts, supplyCurrentAmps, torqueCurrentAmps);
     ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 
@@ -69,12 +72,15 @@ public class SlamIOTalonFX implements SlamIO {
   public void updateInputs(SlamIOInputs inputs) {
     // Refresh status signals and check if hardware connected
     boolean slamMotorConnected =
-        BaseStatusSignal.refreshAll(position, velocity, appliedVolts, current, temp).isOK();
+        BaseStatusSignal.refreshAll(
+                position, velocity, appliedVolts, supplyCurrentAmps, torqueCurrentAmps, temp)
+            .isOK();
     inputs.connected = motorConnectedDebouncer.calculate(slamMotorConnected);
     inputs.positionRad = position.getValue().in(Radians);
     inputs.velocityRadPerSec = velocity.getValue().in(RadiansPerSecond);
     inputs.appliedVolts = appliedVolts.getValue().in(Volts);
-    inputs.currentAmps = current.getValue().in(Amps);
+    inputs.supplyCurrentAmps = supplyCurrentAmps.getValue().in(Amps);
+    inputs.torqueCurrentAmps = torqueCurrentAmps.getValue().in(Amps);
     inputs.tempCelsius = temp.getValue().in(Celsius);
   }
 

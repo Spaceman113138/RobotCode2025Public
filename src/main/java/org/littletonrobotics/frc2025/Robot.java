@@ -168,6 +168,7 @@ public class Robot extends LoggedRobot {
 
     // Robot container periodic methods
     robotContainer.updateAlerts();
+    robotContainer.updateDashboardOutputs();
 
     // Check CAN status
     var canStatus = RobotController.getCANStatus();

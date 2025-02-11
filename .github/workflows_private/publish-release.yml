@@ -26,7 +26,7 @@ jobs:
           git config --global user.name "Mechanical-Advantage-Bot"
       - name: Copy files to public
         run: |
-          rm code-private/README.md
+          rm code-private/README.md code-private/.github/CODEOWNERS
           mv code-private/README-Public.md code-private/README.md
           mv code-private/.github/workflows code-private/.github/workflows_private
           mv code-private/.github/workflows_public code-private/.github/workflows

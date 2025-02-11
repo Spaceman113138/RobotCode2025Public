@@ -47,7 +47,8 @@ public class DispenserIOTalonFX implements DispenserIO {
   private final StatusSignal<Angle> encoderRelativePosition;
   private final StatusSignal<AngularVelocity> Velocity;
   private final StatusSignal<Voltage> appliedVolts;
-  private final StatusSignal<Current> current;
+  private final StatusSignal<Current> supplyCurrentAmps;
+  private final StatusSignal<Current> torqueCurrentAmps;
   private final StatusSignal<Temperature> temp;
 
   // Control Requests
@@ -91,7 +92,8 @@ public class DispenserIOTalonFX implements DispenserIO {
     encoderRelativePosition = encoder.getPosition();
     Velocity = talon.getVelocity();
     appliedVolts = talon.getMotorVoltage();
-    current = talon.getStatorCurrent();
+    supplyCurrentAmps = talon.getSupplyCurrent();
+    torqueCurrentAmps = talon.getTorqueCurrent();
     temp = talon.getDeviceTemp();
 
     BaseStatusSignal.setUpdateFrequencyForAll(
@@ -101,7 +103,8 @@ public class DispenserIOTalonFX implements DispenserIO {
         encoderRelativePosition,
         Velocity,
         appliedVolts,
-        current,
+        supplyCurrentAmps,
+        torqueCurrentAmps,
         temp);
     ParentDevice.optimizeBusUtilizationForAll(talon, encoder);
   }
@@ -110,7 +113,14 @@ public class DispenserIOTalonFX implements DispenserIO {
   public void updateInputs(DispenserIOInputs inputs) {
     // Refresh status signals and check if hardware connected
     boolean motorConnected =
-        BaseStatusSignal.refreshAll(internalPosition, Velocity, appliedVolts, current, temp).isOK();
+        BaseStatusSignal.refreshAll(
+                internalPosition,
+                Velocity,
+                appliedVolts,
+                supplyCurrentAmps,
+                torqueCurrentAmps,
+                temp)
+            .isOK();
     boolean encoderConnected =
         BaseStatusSignal.refreshAll(encoderAbsolutePosition, encoderRelativePosition).isOK();
 
@@ -124,7 +134,8 @@ public class DispenserIOTalonFX implements DispenserIO {
         encoderRelativePosition.getValue().in(Radians) - offset.getRadians();
     inputs.velocityRadPerSec = Velocity.getValue().in(RadiansPerSecond);
     inputs.appliedVolts = appliedVolts.getValue().in(Volts);
-    inputs.currentAmps = current.getValue().in(Amps);
+    inputs.supplyCurrentAmps = supplyCurrentAmps.getValue().in(Amps);
+    inputs.torqueCurrentAmps = torqueCurrentAmps.getValue().in(Amps);
     inputs.tempCelsius = temp.getValue().in(Celsius);
   }
 

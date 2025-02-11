@@ -48,6 +48,7 @@ public class FieldConstants {
   }
 
   public static class CoralStation {
+    public static final double stationLength = Units.inchesToMeters(79.750);
     public static final Pose2d leftCenterFace =
         new Pose2d(
             Units.inchesToMeters(33.526),
@@ -69,7 +70,7 @@ public class FieldConstants {
 
     public static final Pose2d[] centerFaces =
         new Pose2d[6]; // Starting facing the driver station in clockwise order
-    public static final List<Map<ReefHeight, Pose3d>> branchPositions =
+    public static final List<Map<ReefLevel, Pose3d>> branchPositions =
         new ArrayList<>(); // Starting at the right branch facing the driver station in clockwise
 
     static {
@@ -107,9 +108,9 @@ public class FieldConstants {
 
       // Initialize branch positions
       for (int face = 0; face < 6; face++) {
-        Map<ReefHeight, Pose3d> fillRight = new HashMap<>();
-        Map<ReefHeight, Pose3d> fillLeft = new HashMap<>();
-        for (var level : ReefHeight.values()) {
+        Map<ReefLevel, Pose3d> fillRight = new HashMap<>();
+        Map<ReefLevel, Pose3d> fillLeft = new HashMap<>();
+        for (var level : ReefLevel.values()) {
           Pose2d poseDirection = new Pose2d(center, Rotation2d.fromDegrees(180 - (60 * face)));
           double adjustX = Units.inchesToMeters(30.738);
           double adjustY = Units.inchesToMeters(6.469);
@@ -161,18 +162,18 @@ public class FieldConstants {
         new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(86.5), new Rotation2d());
   }
 
-  public enum ReefHeight {
+  public enum ReefLevel {
     L1(Units.inchesToMeters(25.0), 0),
     L2(Units.inchesToMeters(31.875), -35),
     L3(Units.inchesToMeters(47.625), -35),
     L4(Units.inchesToMeters(72), -90);
 
-    ReefHeight(double height, double pitch) {
+    ReefLevel(double height, double pitch) {
       this.height = height;
       this.pitch = pitch; // in degrees
     }
 
-    public static ReefHeight fromLevel(int level) {
+    public static ReefLevel fromLevel(int level) {
       return Arrays.stream(values())
           .filter(height -> height.ordinal() == level)
           .findFirst()
@@ -222,5 +223,7 @@ public class FieldConstants {
     private final String layoutString;
   }
 
-  public record CoralObjective(int branchId, ReefHeight reefLevel) {}
+  public record CoralObjective(int branchId, ReefLevel reefLevel) {}
+
+  public record AlgaeObjective(int id) {}
 }

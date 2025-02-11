@@ -10,6 +10,54 @@
       "degrees": 270
     }
   ],
+  "cameras": [
+    {
+      "name": "Super Camera 1",
+      "rotations": [
+        {
+          "axis": "z",
+          "degrees": -20
+        },
+        {
+          "axis": "y",
+          "degrees": -25.0
+        }
+      ],
+      "position": [
+        0.2286,
+        0.28575,
+        0.152988
+      ],
+      "resolution": [
+        1600,
+        1200
+      ],
+      "fov": 66.62
+    },
+    {
+      "name": "Super Camera 2",
+      "rotations": [
+        {
+          "axis": "z",
+          "degrees": 20
+        },
+        {
+          "axis": "y",
+          "degrees": -25.0
+        }
+      ],
+      "position": [
+        0.2286,
+        -0.28575,
+        0.152988
+      ],
+      "resolution": [
+        1600,
+        1200
+      ],
+      "fov": 66.62
+    }
+  ],
   "components": [
     {
       "zeroedRotations": [

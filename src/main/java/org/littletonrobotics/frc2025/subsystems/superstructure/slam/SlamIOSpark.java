@@ -75,7 +75,7 @@ public class SlamIOSpark implements SlamIO {
         spark,
         new DoubleSupplier[] {spark::getBusVoltage, spark::getAppliedOutput},
         x -> inputs.appliedVolts = x[0] * x[1]);
-    ifOk(spark, spark::getOutputCurrent, current -> inputs.currentAmps = current);
+    ifOk(spark, spark::getOutputCurrent, current -> inputs.torqueCurrentAmps = current);
     inputs.connected = connectedDebouncer.calculate(!sparkStickyFault);
   }
 

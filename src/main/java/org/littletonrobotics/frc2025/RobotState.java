@@ -7,6 +7,7 @@
 
 package org.littletonrobotics.frc2025;
 
+import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.Nat;
 import edu.wpi.first.math.VecBuilder;
@@ -17,6 +18,7 @@ import edu.wpi.first.math.kinematics.SwerveDriveKinematics;
 import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
@@ -36,6 +38,10 @@ public class RobotState {
   // Must be less than 2.0
   private static final LoggedTunableNumber txTyObservationStaleSecs =
       new LoggedTunableNumber("RobotState/TxTyObservationStaleSeconds", 0.5);
+  private static final LoggedTunableNumber minDistanceTagPoseBlend =
+      new LoggedTunableNumber("RobotState/MinDistanceTagPoseBlend", Units.inchesToMeters(24.0));
+  private static final LoggedTunableNumber maxDistanceTagPoseBlend =
+      new LoggedTunableNumber("RobotState/MaxDistanceTagPoseBlend", Units.inchesToMeters(36.0));
 
   private static final double poseBufferSizeSec = 2.0;
   private static final double algaePersistanceTime = 2.0;
@@ -267,6 +273,25 @@ public class RobotState {
     var sample = poseBuffer.getSample(data.timestamp());
     // Latency compensate
     return sample.map(pose2d -> data.pose().plus(new Transform2d(pose2d, odometryPose)));
+  }
+
+  /**
+   * Get estimated pose using txty data given tagId on reef and aligned pose on reef. Used for algae
+   * intaking and coral scoring.
+   */
+  public Pose2d getReefPose(int tagId, Pose2d finalPose) {
+    var tagPose = getTxTyPose(tagId);
+    // Use estimated pose if tag pose is not present
+    if (tagPose.isEmpty()) return RobotState.getInstance().getEstimatedPose();
+    // Use distance from estimated pose to final pose to get t value
+    final double t =
+        MathUtil.clamp(
+            (getEstimatedPose().getTranslation().getDistance(finalPose.getTranslation())
+                    - minDistanceTagPoseBlend.get())
+                / (maxDistanceTagPoseBlend.get() - minDistanceTagPoseBlend.get()),
+            0.0,
+            1.0);
+    return getEstimatedPose().interpolate(tagPose.get(), 1.0 - t);
   }
 
   public void addAlgaeTxTyObservation(AlgaeTxTyObservation observation) {

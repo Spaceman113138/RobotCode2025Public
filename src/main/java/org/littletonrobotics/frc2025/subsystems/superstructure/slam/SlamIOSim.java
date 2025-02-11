@@ -48,7 +48,7 @@ public class SlamIOSim implements SlamIO {
     inputs.positionRad = simState.get(0);
     inputs.velocityRadPerSec = simState.get(1);
     inputs.appliedVolts = appliedVolts;
-    inputs.currentAmps = inputTorqueCurrent;
+    inputs.torqueCurrentAmps = inputTorqueCurrent;
   }
 
   @Override

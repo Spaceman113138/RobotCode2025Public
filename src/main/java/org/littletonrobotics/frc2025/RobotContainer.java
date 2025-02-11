@@ -14,19 +14,20 @@ import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.GenericHID;
+import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.XboxController;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.function.BiConsumer;
+import java.util.function.DoubleSupplier;
+import java.util.function.Supplier;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
-import org.littletonrobotics.frc2025.commands.AutoScore;
-import org.littletonrobotics.frc2025.commands.DriveCommands;
-import org.littletonrobotics.frc2025.commands.DriveTrajectory;
-import org.littletonrobotics.frc2025.commands.IntakeCommands;
+import org.littletonrobotics.frc2025.commands.*;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
@@ -36,8 +37,6 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.*;
-import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.DispenserIO;
-import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.DispenserIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIO;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOSim;
@@ -51,6 +50,7 @@ import org.littletonrobotics.frc2025.util.OverrideSwitches;
 import org.littletonrobotics.frc2025.util.TriggerUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
+import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
 @ExtensionMethod({TriggerUtil.class})
 public class RobotContainer {
@@ -76,6 +76,10 @@ public class RobotContainer {
       new Alert("Operator controller disconnected (port 1).", AlertType.kWarning);
   private final Alert overrideDisconnected =
       new Alert("Override controller disconnected (port 5).", AlertType.kInfo);
+  private final LoggedNetworkNumber endgameAlert1 =
+      new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #1", 30.0);
+  private final LoggedNetworkNumber endgameAlert2 =
+      new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #2", 15.0);
 
   private boolean elevatorCoastOverride = false;
 
@@ -226,6 +230,9 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
+    DoubleSupplier driveLinearX = () -> -driver.getLeftY() - operator.getLeftY();
+    DoubleSupplier driveLinearY = () -> -driver.getLeftX() - operator.getLeftX();
+    DoubleSupplier driveTheta = () -> -driver.getRightX() - operator.getRightX();
     superstructureCoast
         .onTrue(
             Commands.runOnce(
@@ -243,11 +250,7 @@ public class RobotContainer {
     // Default command, normal field-relative drive
     drive.setDefaultCommand(
         DriveCommands.joystickDrive(
-            drive,
-            () -> -driver.getLeftY() - operator.getLeftY(),
-            () -> -driver.getLeftX() - operator.getLeftX(),
-            () -> -driver.getRightX() - operator.getRightX(),
-            robotRelative.getAsBoolean()));
+            drive, driveLinearX, driveLinearY, driveTheta, robotRelative.getAsBoolean()));
 
     // Reset gyro to 0° when B button is pressed
     driver
@@ -263,17 +266,8 @@ public class RobotContainer {
                     drive)
                 .ignoringDisable(true));
 
-    driver
-        .a()
-        .whileTrue(
-            new AutoScore(
-                drive,
-                superstructure,
-                () -> new FieldConstants.CoralObjective(0, FieldConstants.ReefHeight.L3),
-                () -> -driver.getLeftY(),
-                () -> -driver.getLeftX(),
-                () -> -driver.getRightX()))
-        .onFalse(
+    Supplier<Command> superstructureGetBackCommandFactory =
+        () ->
             superstructure
                 .runGoal(superstructure::getState)
                 .until(
@@ -284,9 +278,30 @@ public class RobotContainer {
                           >= FieldConstants.Reef.faceLength
                               + DriveConstants.robotWidth / 2.0
                               + AutoScore.minDistanceReefClear.get();
-                    }));
-    driver.x().whileTrue(superstructure.runGoal(SuperstructureState.THROWN));
-    driver.y().whileTrue(superstructure.runGoal(SuperstructureState.PROCESSING));
+                    })
+                .withName("Superstructure Get Back!");
+    driver
+        .rightTrigger()
+        .whileTrue(
+            new AutoScore(
+                drive,
+                superstructure,
+                () -> new FieldConstants.CoralObjective(1, FieldConstants.ReefLevel.L4),
+                driveLinearX,
+                driveLinearY,
+                driveTheta))
+        .onFalse(superstructureGetBackCommandFactory.get());
+    driver
+        .leftBumper()
+        .whileTrue(
+            new ReefIntake(
+                drive,
+                superstructure,
+                () -> new FieldConstants.AlgaeObjective(1),
+                driveLinearX,
+                driveLinearY,
+                driveTheta))
+        .onFalse(superstructureGetBackCommandFactory.get());
 
     // Operator command for algae intake
     operator
@@ -300,7 +315,7 @@ public class RobotContainer {
     operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
 
     // Operator commands for superstructure
-    BiConsumer<Trigger, FieldConstants.ReefHeight> bindOperatorCoralScore =
+    BiConsumer<Trigger, FieldConstants.ReefLevel> bindOperatorCoralScore =
         (faceButton, height) -> {
           faceButton.whileTrueContinuous(
               superstructure
@@ -318,10 +333,47 @@ public class RobotContainer {
                                   height, superstructure.hasAlgae(), true))
                       .withName("Operator Score & Eject On " + height));
         };
-    bindOperatorCoralScore.accept(operator.a(), FieldConstants.ReefHeight.L1);
-    bindOperatorCoralScore.accept(operator.x(), FieldConstants.ReefHeight.L2);
-    bindOperatorCoralScore.accept(operator.b(), FieldConstants.ReefHeight.L3);
-    bindOperatorCoralScore.accept(operator.y(), FieldConstants.ReefHeight.L4);
+    bindOperatorCoralScore.accept(operator.a(), FieldConstants.ReefLevel.L1);
+    bindOperatorCoralScore.accept(operator.x(), FieldConstants.ReefLevel.L2);
+    bindOperatorCoralScore.accept(operator.b(), FieldConstants.ReefLevel.L3);
+    bindOperatorCoralScore.accept(operator.y(), FieldConstants.ReefLevel.L4);
+
+    // Endgame Alerts
+    new Trigger(
+            () ->
+                DriverStation.isTeleopEnabled()
+                    && DriverStation.getMatchTime() > 0
+                    && DriverStation.getMatchTime() <= Math.round(endgameAlert1.get()))
+        .onTrue(controllerRumbleCommand().withTimeout(0.5));
+    new Trigger(
+            () ->
+                DriverStation.isTeleopEnabled()
+                    && DriverStation.getMatchTime() > 0
+                    && DriverStation.getMatchTime() <= Math.round(endgameAlert2.get()))
+        .onTrue(
+            controllerRumbleCommand()
+                .withTimeout(0.2)
+                .andThen(Commands.waitSeconds(0.1))
+                .repeatedly()
+                .withTimeout(0.9)); // Rumble three times
+  }
+
+  // Creates controller rumble command
+  private Command controllerRumbleCommand() {
+    return Commands.startEnd(
+        () -> {
+          driver.getHID().setRumble(RumbleType.kBothRumble, 1.0);
+          operator.getHID().setRumble(RumbleType.kBothRumble, 1.0);
+        },
+        () -> {
+          driver.getHID().setRumble(RumbleType.kBothRumble, 0.0);
+          operator.getHID().setRumble(RumbleType.kBothRumble, 0.0);
+        });
+  }
+
+  // Update dashboard data
+  public void updateDashboardOutputs() {
+    SmartDashboard.putNumber("Match Time", DriverStation.getMatchTime());
   }
 
   public void updateAlerts() {

@@ -66,7 +66,8 @@ public class ModuleIODev implements ModuleIO {
   private final Queue<Double> drivePositionQueue;
   private final StatusSignal<AngularVelocity> driveVelocity;
   private final StatusSignal<Voltage> driveAppliedVolts;
-  private final StatusSignal<Current> driveCurrent;
+  private final StatusSignal<Current> driveSupplyCurrentAmps;
+  private final StatusSignal<Current> driveTorqueCurrentAmps;
 
   // Inputs from turn motor
   private final Supplier<Rotation2d> turnAbsolutePosition;
@@ -74,7 +75,8 @@ public class ModuleIODev implements ModuleIO {
   private final Queue<Double> turnPositionQueue;
   private final StatusSignal<AngularVelocity> turnVelocity;
   private final StatusSignal<Voltage> turnAppliedVolts;
-  private final StatusSignal<Current> turnCurrent;
+  private final StatusSignal<Current> turnSupplyCurrentAmps;
+  private final StatusSignal<Current> turnTorqueCurrentAmps;
 
   // Connection debouncers
   private final Debouncer driveConnectedDebounce = new Debouncer(0.5);
@@ -130,14 +132,16 @@ public class ModuleIODev implements ModuleIO {
         PhoenixOdometryThread.getInstance().registerSignal(driveTalon.getPosition());
     driveVelocity = driveTalon.getVelocity();
     driveAppliedVolts = driveTalon.getMotorVoltage();
-    driveCurrent = driveTalon.getStatorCurrent();
+    driveSupplyCurrentAmps = driveTalon.getSupplyCurrent();
+    driveTorqueCurrentAmps = driveTalon.getTorqueCurrent();
 
     // Create turn status signals
     turnPosition = turnTalon.getPosition();
     turnPositionQueue = PhoenixOdometryThread.getInstance().registerSignal(turnTalon.getPosition());
     turnVelocity = turnTalon.getVelocity();
     turnAppliedVolts = turnTalon.getMotorVoltage();
-    turnCurrent = turnTalon.getStatorCurrent();
+    turnSupplyCurrentAmps = turnTalon.getSupplyCurrent();
+    turnTorqueCurrentAmps = turnTalon.getTorqueCurrent();
 
     // Configure periodic frames
     BaseStatusSignal.setUpdateFrequencyForAll(
@@ -146,10 +150,12 @@ public class ModuleIODev implements ModuleIO {
         50.0,
         driveVelocity,
         driveAppliedVolts,
-        driveCurrent,
+        driveSupplyCurrentAmps,
+        driveTorqueCurrentAmps,
         turnVelocity,
         turnAppliedVolts,
-        turnCurrent);
+        turnSupplyCurrentAmps,
+        turnTorqueCurrentAmps);
     ParentDevice.optimizeBusUtilizationForAll(driveTalon, turnTalon);
   }
 
@@ -157,16 +163,27 @@ public class ModuleIODev implements ModuleIO {
   public void updateInputs(ModuleIO.ModuleIOInputs inputs) {
     // Refresh all signals
     var driveStatus =
-        BaseStatusSignal.refreshAll(drivePosition, driveVelocity, driveAppliedVolts, driveCurrent);
+        BaseStatusSignal.refreshAll(
+            drivePosition,
+            driveVelocity,
+            driveAppliedVolts,
+            driveSupplyCurrentAmps,
+            driveTorqueCurrentAmps);
     var turnStatus =
-        BaseStatusSignal.refreshAll(turnPosition, turnVelocity, turnAppliedVolts, turnCurrent);
+        BaseStatusSignal.refreshAll(
+            turnPosition,
+            turnVelocity,
+            turnAppliedVolts,
+            turnSupplyCurrentAmps,
+            turnTorqueCurrentAmps);
 
     // Update drive inputs
     inputs.driveConnected = driveConnectedDebounce.calculate(driveStatus.isOK());
     inputs.drivePositionRad = Units.rotationsToRadians(drivePosition.getValueAsDouble());
     inputs.driveVelocityRadPerSec = Units.rotationsToRadians(driveVelocity.getValueAsDouble());
     inputs.driveAppliedVolts = driveAppliedVolts.getValueAsDouble();
-    inputs.driveCurrentAmps = driveCurrent.getValueAsDouble();
+    inputs.driveSupplyCurrentAmps = driveSupplyCurrentAmps.getValueAsDouble();
+    inputs.driveTorqueCurrentAmps = driveTorqueCurrentAmps.getValueAsDouble();
 
     // Update turn inputs
     inputs.turnConnected = turnConnectedDebounce.calculate(turnStatus.isOK());
@@ -175,7 +192,8 @@ public class ModuleIODev implements ModuleIO {
     inputs.turnPosition = Rotation2d.fromRotations(turnPosition.getValueAsDouble());
     inputs.turnVelocityRadPerSec = Units.rotationsToRadians(turnVelocity.getValueAsDouble());
     inputs.turnAppliedVolts = turnAppliedVolts.getValueAsDouble();
-    inputs.turnCurrentAmps = turnCurrent.getValueAsDouble();
+    inputs.turnSupplyCurrentAmps = turnSupplyCurrentAmps.getValueAsDouble();
+    inputs.turnTorqueCurrentAmps = turnTorqueCurrentAmps.getValueAsDouble();
 
     // Update odometry inputs
     inputs.odometryTimestamps =
