@@ -48,7 +48,7 @@ public class Superstructure extends SubsystemBase {
 
   @Getter private SuperstructureState state = SuperstructureState.START;
   private SuperstructureState next = null;
-  private SuperstructureState goal = SuperstructureState.START;
+  @Getter private SuperstructureState goal = SuperstructureState.START;
 
   @AutoLogOutput(key = "Superstructure/EStopped")
   private boolean isEStopped = false;
@@ -528,16 +528,17 @@ public class Superstructure extends SubsystemBase {
       return EdgeCommand.builder()
           .command(
               addSlamAvoidance(
-                  runElevator(
-                          () ->
-                              MathUtil.clamp(
-                                  elevator.getPositionMeters(),
-                                  SuperstructureConstants.algaeMinPassThroughHeight,
-                                  SuperstructureConstants.elevatorMaxTravel))
-                      .alongWith(runDispenserPivot(to.getValue().getPose().pivotAngle()))
-                      .andThen(Commands.waitUntil(this::isAtGoal)),
-                  from,
-                  to))
+                      runElevator(
+                              () ->
+                                  MathUtil.clamp(
+                                      elevator.getPositionMeters(),
+                                      SuperstructureConstants.algaeMinPassThroughHeight,
+                                      SuperstructureConstants.elevatorMaxTravel))
+                          .alongWith(runDispenserPivot(to.getValue().getPose().pivotAngle()))
+                          .andThen(Commands.waitUntil(this::isAtGoal)),
+                      from,
+                      to)
+                  .andThen(runSuperstructureExtras(to)))
           .build();
     } else {
       // Just run to next state if no restrictions
@@ -556,10 +557,7 @@ public class Superstructure extends SubsystemBase {
   private Command addSlamAvoidance(
       Command command, SuperstructureState from, SuperstructureState to) {
     return Commands.sequence(
-        from.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE)
-                || to.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE)
-            ? getSlamCommand(Goal.SLAM_DOWN)
-            : Commands.none(),
+        willSlam(from, to) ? getSlamCommand(Goal.SLAM_DOWN) : Commands.none(),
         command,
         getSlamCommand(to.getValue().getSlamGoal()));
   }
@@ -631,6 +629,11 @@ public class Superstructure extends SubsystemBase {
                   ? SuperstructureState.L4_CORAL_REVERSED_EJECT
                   : SuperstructureState.L4_CORAL_REVERSED);
     };
+  }
+
+  public static boolean willSlam(SuperstructureState from, SuperstructureState to) {
+    return from.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE)
+        != to.getValue().getHeight().lowerThan(SuperstructureStateData.Height.INTAKE);
   }
 
   /** All edge commands should finish and exit properly. */

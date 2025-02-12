@@ -40,18 +40,12 @@ public class DriveToPose extends Command {
       new LoggedTunableNumber("DriveToPose/DriveMaxAcceleration");
   private static final LoggedTunableNumber thetaMaxVelocity =
       new LoggedTunableNumber("DriveToPose/ThetaMaxVelocity");
-  private static final LoggedTunableNumber thetaMaxVelocitySlow =
-      new LoggedTunableNumber("DriveToPose/ThetaMaxVelocitySlow");
   private static final LoggedTunableNumber thetaMaxAcceleration =
       new LoggedTunableNumber("DriveToPose/ThetaMaxAcceleration");
   private static final LoggedTunableNumber driveTolerance =
       new LoggedTunableNumber("DriveToPose/DriveTolerance");
-  private static final LoggedTunableNumber driveToleranceSlow =
-      new LoggedTunableNumber("DriveToPose/DriveToleranceSlow");
   private static final LoggedTunableNumber thetaTolerance =
       new LoggedTunableNumber("DriveToPose/ThetaTolerance");
-  private static final LoggedTunableNumber thetaToleranceSlow =
-      new LoggedTunableNumber("DriveToPose/ThetaToleranceSlow");
   private static final LoggedTunableNumber ffMinRadius =
       new LoggedTunableNumber("DriveToPose/FFMinRadius");
   private static final LoggedTunableNumber ffMaxRadius =
@@ -63,15 +57,11 @@ public class DriveToPose extends Command {
     thetakP.initDefault(5.0);
     thetakD.initDefault(0.0);
     driveMaxVelocity.initDefault(Units.inchesToMeters(150.0));
-    driveMaxVelocitySlow.initDefault(Units.inchesToMeters(50.0));
     driveMaxAcceleration.initDefault(Units.inchesToMeters(95.0));
     thetaMaxVelocity.initDefault(Units.degreesToRadians(360.0));
-    thetaMaxVelocitySlow.initDefault(Units.degreesToRadians(90.0));
     thetaMaxAcceleration.initDefault(Units.degreesToRadians(720.0));
     driveTolerance.initDefault(0.01);
-    driveToleranceSlow.initDefault(0.06);
     thetaTolerance.initDefault(Units.degreesToRadians(1.0));
-    thetaToleranceSlow.initDefault(Units.degreesToRadians(3.0));
     ffMinRadius.initDefault(0.2);
     ffMaxRadius.initDefault(0.8);
   }
@@ -154,12 +144,9 @@ public class DriveToPose extends Command {
         || driveMaxVelocitySlow.hasChanged(hashCode())
         || driveMaxAcceleration.hasChanged(hashCode())
         || driveTolerance.hasChanged(hashCode())
-        || driveToleranceSlow.hasChanged(hashCode())
         || thetaMaxVelocity.hasChanged(hashCode())
-        || thetaMaxVelocitySlow.hasChanged(hashCode())
         || thetaMaxAcceleration.hasChanged(hashCode())
         || thetaTolerance.hasChanged(hashCode())
-        || thetaToleranceSlow.hasChanged(hashCode())
         || drivekP.hasChanged(hashCode())
         || drivekD.hasChanged(hashCode())
         || thetakP.hasChanged(hashCode())

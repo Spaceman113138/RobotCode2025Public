@@ -283,7 +283,7 @@ public class RobotContainer {
     driver
         .rightTrigger()
         .whileTrue(
-            new AutoScore(
+            AutoScore.getAutoScoreCommand(
                 drive,
                 superstructure,
                 () -> new FieldConstants.CoralObjective(1, FieldConstants.ReefLevel.L4),
@@ -294,7 +294,7 @@ public class RobotContainer {
     driver
         .leftBumper()
         .whileTrue(
-            new ReefIntake(
+            AutoScore.getReefIntakeCommand(
                 drive,
                 superstructure,
                 () -> new FieldConstants.AlgaeObjective(1),

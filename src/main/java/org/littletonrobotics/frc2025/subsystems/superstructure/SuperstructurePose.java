@@ -14,7 +14,6 @@ import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -27,9 +26,6 @@ import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotation2d> pivotAngle) {
-  private static final double groundToCarriageZero = dispenserOrigin2d.getY();
-  private static final double tunnelEjectMeters = Units.inchesToMeters(5.0);
-  private static final double tunnelEjectMetersReverse = Units.inchesToMeters(8.0);
   private static final double reefAlgaeIntakeAngle = 15.0;
 
   private static final Map<ReefLevel, Pair<Double, Double>> ejectMeters =
@@ -110,12 +106,19 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
       return pose.getRotation().getDegrees();
     }
 
-    public static DispenserPose fromReefLevel(ReefLevel ReefLevel, boolean algae) {
-      return Arrays.stream(values())
-          .filter(
-              dispenserPose -> dispenserPose.reefLevel == ReefLevel && dispenserPose.algae == algae)
-          .findFirst()
-          .orElse(L1);
+    public static DispenserPose fromReefLevel(ReefLevel reefLevel, boolean algae) {
+      return switch (reefLevel) {
+        case L1 -> algae ? DispenserPose.L1_ALGAE : DispenserPose.L1;
+        case L2 -> algae ? DispenserPose.L2_ALGAE : DispenserPose.L2;
+        case L3 -> algae ? DispenserPose.L3_ALGAE : DispenserPose.L3;
+        case L4 -> algae ? DispenserPose.L4_ALGAE : DispenserPose.L4;
+      };
+    }
+
+    public static DispenserPose fromAlgaeObjective(FieldConstants.AlgaeObjective objective) {
+      return (objective.id() % 2 == 0)
+          ? DispenserPose.L3_ALGAE_INTAKE
+          : DispenserPose.L2_ALGAE_INTAKE;
     }
 
     private static Translation2d getAlgaeIntakeTranslation(boolean low) {

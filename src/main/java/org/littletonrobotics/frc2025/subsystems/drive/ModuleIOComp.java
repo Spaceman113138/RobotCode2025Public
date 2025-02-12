@@ -7,7 +7,6 @@
 
 package org.littletonrobotics.frc2025.subsystems.drive;
 
-import static org.littletonrobotics.frc2025.subsystems.drive.DriveConstants.ModuleConfig;
 import static org.littletonrobotics.frc2025.util.PhoenixUtil.tryUntilOk;
 
 import com.ctre.phoenix6.BaseStatusSignal;

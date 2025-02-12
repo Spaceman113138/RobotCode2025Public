@@ -28,6 +28,7 @@ import lombok.Setter;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionConstants;
+import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -279,8 +280,19 @@ public class RobotState {
    * Get estimated pose using txty data given tagId on reef and aligned pose on reef. Used for algae
    * intaking and coral scoring.
    */
-  public Pose2d getReefPose(int tagId, Pose2d finalPose) {
-    var tagPose = getTxTyPose(tagId);
+  public Pose2d getReefPose(int face, Pose2d finalPose) {
+    final boolean isRed = AllianceFlipUtil.shouldFlip();
+    var tagPose =
+        getTxTyPose(
+            switch (face) {
+              case 1 -> isRed ? 6 : 19;
+              case 2 -> isRed ? 11 : 20;
+              case 3 -> isRed ? 10 : 21;
+              case 4 -> isRed ? 9 : 22;
+              case 5 -> isRed ? 8 : 17;
+                // 0
+              default -> isRed ? 7 : 18;
+            });
     // Use estimated pose if tag pose is not present
     if (tagPose.isEmpty()) return RobotState.getInstance().getEstimatedPose();
     // Use distance from estimated pose to final pose to get t value
