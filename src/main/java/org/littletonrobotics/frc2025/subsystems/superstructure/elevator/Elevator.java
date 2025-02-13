@@ -38,6 +38,7 @@ public class Elevator {
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Elevator/kD");
   private static final LoggedTunableNumber kS = new LoggedTunableNumber("Elevator/kS");
   private static final LoggedTunableNumber kG = new LoggedTunableNumber("Elevator/kG");
+  private static final LoggedTunableNumber kA = new LoggedTunableNumber("Elevator/kA");
   private static final LoggedTunableNumber maxVelocityMetersPerSec =
       new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 2.0);
   private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
@@ -60,12 +61,14 @@ public class Elevator {
         kD.initDefault(30);
         kS.initDefault(0);
         kG.initDefault(5);
+        kA.initDefault(0);
       }
       case SIMBOT -> {
         kP.initDefault(5000);
         kD.initDefault(2000);
         kS.initDefault(5);
         kG.initDefault(50);
+        kA.initDefault(0);
       }
     }
   }
@@ -150,6 +153,7 @@ public class Elevator {
           new State(
               MathUtil.clamp(goal.get().position, 0.0, SuperstructureConstants.elevatorMaxTravel),
               goal.get().velocity);
+      double previousVelocity = setpoint.velocity;
       setpoint = profile.calculate(Constants.loopPeriodSecs, setpoint, goalState);
       if (setpoint.position < 0.0
           || setpoint.position > SuperstructureConstants.elevatorMaxTravel) {
@@ -158,10 +162,13 @@ public class Elevator {
                 MathUtil.clamp(setpoint.position, 0.0, SuperstructureConstants.elevatorMaxTravel),
                 0.0);
       }
+
+      double accel = (setpoint.velocity - previousVelocity) / Constants.loopPeriodSecs;
       io.runPosition(
           setpoint.position / drumRadius + homedPosition,
           kS.get() * Math.signum(setpoint.velocity) // Magnitude irrelevant
-              + kG.get() * SuperstructureConstants.elevatorAngle.getSin());
+              + kG.get()
+              + kA.get() * accel);
       // Check at goal
       atGoal =
           EqualsUtil.epsilonEquals(setpoint.position, goalState.position)

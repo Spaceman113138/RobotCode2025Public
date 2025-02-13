@@ -387,11 +387,11 @@ public class RobotContainer {
     overrideDisconnected.set(!overrides.isConnected());
 
     // AprilTag layout alert
-    boolean aprilTagAlertActive = getSelectedAprilTagLayout() != AprilTagLayoutType.OFFICIAL;
+    boolean aprilTagAlertActive = getSelectedAprilTagLayout() != FieldConstants.defaultAprilTagType;
     aprilTagLayoutAlert.set(aprilTagAlertActive);
     if (aprilTagAlertActive) {
       aprilTagLayoutAlert.setText(
-          "Non-official AprilTag layout in use (" + getSelectedAprilTagLayout().toString() + ").");
+          "Non-default AprilTag layout in use (" + getSelectedAprilTagLayout().toString() + ").");
     }
   }
 
