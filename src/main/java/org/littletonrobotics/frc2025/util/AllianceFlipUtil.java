@@ -14,7 +14,6 @@ import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOu
 import org.littletonrobotics.vehicletrajectoryservice.VehicleTrajectoryServiceOuterClass.VehicleState;
 
 public class AllianceFlipUtil {
-
   public static double applyX(double x) {
     return shouldFlip() ? FieldConstants.fieldLength - x : x;
   }

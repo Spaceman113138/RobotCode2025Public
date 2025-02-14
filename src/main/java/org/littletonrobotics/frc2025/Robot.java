@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiConsumer;
 import org.littletonrobotics.frc2025.Constants.RobotType;
+import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.util.CanivoreReader;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.AutoLogOutputManager;
@@ -36,6 +37,8 @@ public class Robot extends LoggedRobot {
   private static final double canivoreErrorTimeThreshold = 0.5;
   private static final double lowBatteryVoltage = 11.8;
   private static final double lowBatteryDisabledTime = 1.5;
+  private static final double lowBatteryMinCycleCount = 10;
+  private static int lowBatteryCycleCount = 0;
 
   private Command autonomousCommand;
   private RobotContainer robotContainer;
@@ -57,6 +60,9 @@ public class Robot extends LoggedRobot {
           AlertType.kWarning);
 
   public Robot() {
+    // Start loading animation
+    Leds.getInstance();
+
     // Record metadata
     Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
     Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
@@ -201,12 +207,15 @@ public class Robot extends LoggedRobot {
     }
 
     // Low battery alert
+    lowBatteryCycleCount += 1;
     if (DriverStation.isEnabled()) {
       disabledTimer.reset();
     }
     if (RobotController.getBatteryVoltage() <= lowBatteryVoltage
-        && disabledTimer.hasElapsed(lowBatteryDisabledTime)) {
+        && disabledTimer.hasElapsed(lowBatteryDisabledTime)
+        && lowBatteryCycleCount >= lowBatteryMinCycleCount) {
       lowBatteryAlert.set(true);
+      Leds.getInstance().lowBatteryAlert = true;
     }
 
     // Log robot state values

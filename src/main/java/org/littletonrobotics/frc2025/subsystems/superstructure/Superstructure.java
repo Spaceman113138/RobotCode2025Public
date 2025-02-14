@@ -29,6 +29,7 @@ import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.FieldConstants;
+import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
@@ -310,6 +311,7 @@ public class Superstructure extends SubsystemBase {
 
     driverDisableAlert.set(disabledOverride.getAsBoolean());
     emergencyDisableAlert.set(isEStopped);
+    Leds.getInstance().superstructureEstopped = isEStopped;
 
     // Log state
     Logger.recordOutput("Superstructure/State", state);

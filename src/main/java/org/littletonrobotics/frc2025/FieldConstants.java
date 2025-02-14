@@ -17,21 +17,27 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 
 /**
  * Contains various field dimensions and useful reference points. All units are in meters and poses
  * have a blue alliance origin.
  */
 public class FieldConstants {
-  public static final double fieldLength = Units.inchesToMeters(690.876);
-  public static final double fieldWidth = Units.inchesToMeters(317);
+  public static final FieldType fieldType = FieldType.WELDED;
+
+  public static final double fieldLength = AprilTagLayoutType.OFFICIAL.getLayout().getFieldLength();
+  public static final double fieldWidth = AprilTagLayoutType.OFFICIAL.getLayout().getFieldWidth();
   public static final double startingLineX =
       Units.inchesToMeters(299.438); // Measured from the inside of starting line
   public static final double algaeDiameter = Units.inchesToMeters(16);
 
   public static class Processor {
     public static final Pose2d centerFace =
-        new Pose2d(Units.inchesToMeters(235.726), 0, Rotation2d.fromDegrees(90));
+        new Pose2d(
+            AprilTagLayoutType.OFFICIAL.getLayout().getTagPose(16).get().getX(),
+            0,
+            Rotation2d.fromDegrees(90));
   }
 
   public static class Barge {
@@ -49,22 +55,22 @@ public class FieldConstants {
 
   public static class CoralStation {
     public static final double stationLength = Units.inchesToMeters(79.750);
-    public static final Pose2d leftCenterFace =
-        new Pose2d(
-            Units.inchesToMeters(33.526),
-            Units.inchesToMeters(291.176),
-            Rotation2d.fromDegrees(90 - 144.011));
     public static final Pose2d rightCenterFace =
         new Pose2d(
             Units.inchesToMeters(33.526),
             Units.inchesToMeters(25.824),
             Rotation2d.fromDegrees(144.011 - 90));
+    public static final Pose2d leftCenterFace =
+        new Pose2d(
+            rightCenterFace.getX(),
+            fieldWidth - rightCenterFace.getY(),
+            Rotation2d.fromRadians(-rightCenterFace.getRotation().getRadians()));
   }
 
   public static class Reef {
     public static final double faceLength = Units.inchesToMeters(36.792600);
     public static final Translation2d center =
-        new Translation2d(Units.inchesToMeters(176.746), Units.inchesToMeters(158.501));
+        new Translation2d(Units.inchesToMeters(176.746), fieldWidth / 2.0);
     public static final double faceToZoneLine =
         Units.inchesToMeters(12); // Side of the reef to the inside of the reef zone line
 
@@ -75,36 +81,13 @@ public class FieldConstants {
 
     static {
       // Initialize faces
-      centerFaces[0] =
-          new Pose2d(
-              Units.inchesToMeters(144.003),
-              Units.inchesToMeters(158.500),
-              Rotation2d.fromDegrees(180));
-      centerFaces[1] =
-          new Pose2d(
-              Units.inchesToMeters(160.373),
-              Units.inchesToMeters(186.857),
-              Rotation2d.fromDegrees(120));
-      centerFaces[2] =
-          new Pose2d(
-              Units.inchesToMeters(193.116),
-              Units.inchesToMeters(186.858),
-              Rotation2d.fromDegrees(60));
-      centerFaces[3] =
-          new Pose2d(
-              Units.inchesToMeters(209.489),
-              Units.inchesToMeters(158.502),
-              Rotation2d.fromDegrees(0));
-      centerFaces[4] =
-          new Pose2d(
-              Units.inchesToMeters(193.118),
-              Units.inchesToMeters(130.145),
-              Rotation2d.fromDegrees(-60));
-      centerFaces[5] =
-          new Pose2d(
-              Units.inchesToMeters(160.375),
-              Units.inchesToMeters(130.144),
-              Rotation2d.fromDegrees(-120));
+      var aprilTagLayout = AprilTagLayoutType.OFFICIAL.getLayout();
+      centerFaces[0] = aprilTagLayout.getTagPose(18).get().toPose2d();
+      centerFaces[1] = aprilTagLayout.getTagPose(19).get().toPose2d();
+      centerFaces[2] = aprilTagLayout.getTagPose(20).get().toPose2d();
+      centerFaces[3] = aprilTagLayout.getTagPose(21).get().toPose2d();
+      centerFaces[4] = aprilTagLayout.getTagPose(22).get().toPose2d();
+      centerFaces[5] = aprilTagLayout.getTagPose(17).get().toPose2d();
 
       // Initialize branch positions
       for (int face = 0; face < 6; face++) {
@@ -154,23 +137,24 @@ public class FieldConstants {
 
   public static class StagingPositions {
     // Measured from the center of the ice cream
-    public static final Pose2d leftIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(230.5), new Rotation2d());
+    public static final double separation = Units.inchesToMeters(72.0);
     public static final Pose2d middleIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(158.5), new Rotation2d());
+        new Pose2d(Units.inchesToMeters(48), fieldWidth / 2.0, new Rotation2d());
+    public static final Pose2d leftIceCream =
+        new Pose2d(Units.inchesToMeters(48), middleIceCream.getY() + separation, new Rotation2d());
     public static final Pose2d rightIceCream =
-        new Pose2d(Units.inchesToMeters(48), Units.inchesToMeters(86.5), new Rotation2d());
+        new Pose2d(Units.inchesToMeters(48), middleIceCream.getY() - separation, new Rotation2d());
   }
 
   public enum ReefLevel {
     L1(Units.inchesToMeters(25.0), 0),
-    L2(Units.inchesToMeters(31.875), -35),
-    L3(Units.inchesToMeters(47.625), -35),
+    L2(Units.inchesToMeters(31.875 - Math.cos(Math.toRadians(35.0)) * 0.625), -35),
+    L3(Units.inchesToMeters(47.625 - Math.cos(Math.toRadians(35.0)) * 0.625), -35),
     L4(Units.inchesToMeters(72), -90);
 
     ReefLevel(double height, double pitch) {
       this.height = height;
-      this.pitch = pitch; // in degrees
+      this.pitch = pitch; // Degrees
     }
 
     public static ReefLevel fromLevel(int level) {
@@ -202,7 +186,11 @@ public class FieldConstants {
         try {
           layout =
               new AprilTagFieldLayout(
-                  Path.of(Filesystem.getDeployDirectory().getPath(), "apriltags", name + ".json"));
+                  Path.of(
+                      Filesystem.getDeployDirectory().getPath(),
+                      "apriltags",
+                      fieldType.getJsonFolder(),
+                      name + ".json"));
         } catch (IOException e) {
           throw new RuntimeException(e);
         }
@@ -226,4 +214,12 @@ public class FieldConstants {
   public record CoralObjective(int branchId, ReefLevel reefLevel) {}
 
   public record AlgaeObjective(int id) {}
+
+  @RequiredArgsConstructor
+  public enum FieldType {
+    ANDYMARK("andymark"),
+    WELDED("welded");
+
+    @Getter private final String jsonFolder;
+  }
 }

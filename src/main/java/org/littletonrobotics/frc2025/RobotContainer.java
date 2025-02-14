@@ -29,6 +29,7 @@ import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
 import org.littletonrobotics.frc2025.commands.*;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
+import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
@@ -59,6 +60,7 @@ public class RobotContainer {
   private Vision vision;
   private final Superstructure superstructure;
   private RollerSystem funnel;
+  private final Leds leds = Leds.getInstance();
 
   // Controllers
   private final CommandXboxController driver = new CommandXboxController(0);
@@ -81,7 +83,7 @@ public class RobotContainer {
   private final LoggedNetworkNumber endgameAlert2 =
       new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #2", 15.0);
 
-  private boolean elevatorCoastOverride = false;
+  private boolean superstructureCoastOverride = false;
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -91,6 +93,7 @@ public class RobotContainer {
     Elevator elevator = null;
     Dispenser dispenser = null;
     Slam slam = null;
+
     if (Constants.getMode() != Constants.Mode.REPLAY) {
       switch (Constants.getRobot()) {
         case COMPBOT -> {
@@ -215,9 +218,9 @@ public class RobotContainer {
 
     // Set up overrides
     superstructure.setDisabledOverride(superstructureDisable);
-    elevator.setOverrides(() -> elevatorCoastOverride, superstructureDisable);
-    dispenser.setOverrides(() -> elevatorCoastOverride, superstructureDisable);
-    slam.setCoastOverride(() -> elevatorCoastOverride);
+    elevator.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
+    dispenser.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
+    slam.setCoastOverride(() -> superstructureCoastOverride);
 
     // Configure the button bindings
     configureButtonBindings();
@@ -238,14 +241,26 @@ public class RobotContainer {
             Commands.runOnce(
                     () -> {
                       if (DriverStation.isDisabled()) {
-                        elevatorCoastOverride = true;
+                        superstructureCoastOverride = true;
+                        leds.superstructureCoast = true;
                       }
                     })
                 .ignoringDisable(true))
-        .onFalse(Commands.runOnce(() -> elevatorCoastOverride = false).ignoringDisable(true));
-
+        .onFalse(
+            Commands.runOnce(
+                    () -> {
+                      superstructureCoastOverride = false;
+                      leds.superstructureCoast = false;
+                    })
+                .ignoringDisable(true));
     RobotModeTriggers.disabled()
-        .onFalse(Commands.runOnce(() -> elevatorCoastOverride = false).ignoringDisable(true));
+        .onFalse(
+            Commands.runOnce(
+                    () -> {
+                      superstructureCoastOverride = false;
+                      leds.superstructureCoast = false;
+                    })
+                .ignoringDisable(true));
 
     // Default command, normal field-relative drive
     drive.setDefaultCommand(
@@ -338,13 +353,24 @@ public class RobotContainer {
     bindOperatorCoralScore.accept(operator.b(), FieldConstants.ReefLevel.L3);
     bindOperatorCoralScore.accept(operator.y(), FieldConstants.ReefLevel.L4);
 
+    // Strobe LEDs at human player
+    driver
+        .y()
+        .whileTrue(
+            Commands.startEnd(
+                () -> leds.hpAttentionAlert = true, () -> leds.hpAttentionAlert = false));
+
     // Endgame Alerts
     new Trigger(
             () ->
                 DriverStation.isTeleopEnabled()
                     && DriverStation.getMatchTime() > 0
                     && DriverStation.getMatchTime() <= Math.round(endgameAlert1.get()))
-        .onTrue(controllerRumbleCommand().withTimeout(0.5));
+        .onTrue(
+            controllerRumbleCommand()
+                .withTimeout(0.5)
+                .beforeStarting(() -> leds.endgameAlert = true)
+                .finallyDo(() -> leds.endgameAlert = false));
     new Trigger(
             () ->
                 DriverStation.isTeleopEnabled()
@@ -355,7 +381,9 @@ public class RobotContainer {
                 .withTimeout(0.2)
                 .andThen(Commands.waitSeconds(0.1))
                 .repeatedly()
-                .withTimeout(0.9)); // Rumble three times
+                .withTimeout(0.9)
+                .beforeStarting(() -> leds.endgameAlert = true)
+                .finallyDo(() -> leds.endgameAlert = false)); // Rumble three times
   }
 
   // Creates controller rumble command
