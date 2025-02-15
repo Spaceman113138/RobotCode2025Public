@@ -64,6 +64,10 @@ public class Robot extends LoggedRobot {
     Leds.getInstance();
 
     // Record metadata
+    Logger.recordMetadata("Robot", Constants.getRobot().toString());
+    Logger.recordMetadata("TuningMode", Boolean.toString(Constants.tuningMode));
+    Logger.recordMetadata("FieldType", FieldConstants.fieldType.toString());
+    Logger.recordMetadata("RuntimeType", getRuntimeType().toString());
     Logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
     Logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
     Logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
