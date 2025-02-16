@@ -57,17 +57,26 @@ public class VisionIONorthstar implements VisionIO {
         outputTable
             .getDoubleArrayTopic("observations")
             .subscribe(
-                new double[] {}, PubSubOption.keepDuplicates(true), PubSubOption.sendAll(true));
+                new double[] {},
+                PubSubOption.keepDuplicates(true),
+                PubSubOption.sendAll(true),
+                PubSubOption.periodic(0.005));
     demoObservationSubscriber =
         outputTable
             .getDoubleArrayTopic("demo_observations")
             .subscribe(
-                new double[] {}, PubSubOption.keepDuplicates(true), PubSubOption.sendAll(true));
+                new double[] {},
+                PubSubOption.keepDuplicates(true),
+                PubSubOption.sendAll(true),
+                PubSubOption.periodic(0.005));
     objDetectObservationSubscriber =
         outputTable
             .getDoubleArrayTopic("objdetect_observations")
             .subscribe(
-                new double[] {}, PubSubOption.keepDuplicates(true), PubSubOption.sendAll(true));
+                new double[] {},
+                PubSubOption.keepDuplicates(true),
+                PubSubOption.sendAll(true),
+                PubSubOption.periodic(0.005));
     fpsAprilTagsSubscriber = outputTable.getIntegerTopic("fps_apriltags").subscribe(0);
     fpsObjDetectSubscriber = outputTable.getIntegerTopic("fps_objdetect").subscribe(0);
 

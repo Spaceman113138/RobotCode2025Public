@@ -147,8 +147,9 @@ class AVFoundationCapture(Capture):
 class PylonCapture(Capture):
     """Reads from a Basler camera using pylon."""
 
-    def __init__(self, mode: str = "") -> None:
+    def __init__(self, mode: str = "", is_flipped: bool = False) -> None:
         self._mode = mode
+        self._is_flipped = is_flipped
 
     _camera: Union[None, pylon.InstantCamera] = None
     _converter: Union[None, pylon.ImageFormatConverter] = None
@@ -190,6 +191,10 @@ class PylonCapture(Capture):
                     self._camera.GetNodeMap().GetNode("OffsetX").SetValue(168)
                     self._camera.GetNodeMap().GetNode("OffsetY").SetValue(8)
 
+                if self._is_flipped:
+                    self._camera.GetNodeMap().GetNode("ReverseX").SetValue(True)
+                    self._camera.GetNodeMap().GetNode("ReverseY").SetValue(True)
+
                 self._camera.StartGrabbing(pylon.GrabStrategy_LatestImageOnly)
                 print("Capture session ready")
 
@@ -205,7 +210,7 @@ class PylonCapture(Capture):
                     try:
                         if self._converter == None:
                             return True, grab_result.Array
-                        else: 
+                        else:
                             return True, self._converter.Convert(grab_result).Array
                     except Exception:
                         print("Error when capturing frame:", traceback.format_exc())
@@ -273,7 +278,10 @@ CAPTURE_IMPLS = {
     "": DefaultCapture,
     "avfoundation": AVFoundationCapture,
     "pylon": lambda: PylonCapture(),
+    "pylon-flipped": lambda: PylonCapture(is_flipped=True),
     "pylon-color": lambda: PylonCapture("color"),
+    "pylon-color-flipped": lambda: PylonCapture("color", is_flipped=True),
     "pylon-cropped": lambda: PylonCapture("cropped"),
+    "pylon-cropped-flipped": lambda: PylonCapture("cropped", is_flipped=True),
     "gstreamer": GStreamerCapture,
 }

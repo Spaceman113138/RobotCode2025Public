@@ -35,9 +35,9 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
           ReefLevel.L2,
           Pair.of(Units.inchesToMeters(5.0), Units.inchesToMeters(12.0)),
           ReefLevel.L3,
-          Pair.of(Units.inchesToMeters(5.0), Units.inchesToMeters(12.0)),
+          Pair.of(Units.inchesToMeters(5.0), Units.inchesToMeters(8.0)),
           ReefLevel.L4,
-          Pair.of(Units.inchesToMeters(5.0), Units.inchesToMeters(12.0)));
+          Pair.of(Units.inchesToMeters(5.0), Units.inchesToMeters(6.0)));
   private static final Map<ReefLevel, Pair<Double, Double>> optimalCoralAngles =
       Map.of(
           ReefLevel.L1,

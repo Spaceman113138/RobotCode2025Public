@@ -12,7 +12,7 @@
   ],
   "cameras": [
     {
-      "name": "Super Camera 1",
+      "name": "Swerve Left",
       "rotations": [
         {
           "axis": "z",
@@ -24,9 +24,9 @@
         }
       ],
       "position": [
+        0.2794,
         0.2286,
-        0.28575,
-        0.152988
+        0.21113
       ],
       "resolution": [
         1600,
@@ -35,7 +35,7 @@
       "fov": 66.62
     },
     {
-      "name": "Super Camera 2",
+      "name": "Swerve Right",
       "rotations": [
         {
           "axis": "z",
@@ -47,9 +47,9 @@
         }
       ],
       "position": [
-        0.2286,
-        -0.28575,
-        0.152988
+        0.2794,
+        -0.2286,
+        0.21113
       ],
       "resolution": [
         1600,

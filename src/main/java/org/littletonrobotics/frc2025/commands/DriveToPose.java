@@ -49,21 +49,21 @@ public class DriveToPose extends Command {
   private static final LoggedTunableNumber ffMinRadius =
       new LoggedTunableNumber("DriveToPose/FFMinRadius");
   private static final LoggedTunableNumber ffMaxRadius =
-      new LoggedTunableNumber("DriveToPose/FFMinRadius");
+      new LoggedTunableNumber("DriveToPose/FFMaxRadius");
 
   static {
-    drivekP.initDefault(2.0);
+    drivekP.initDefault(0.75);
     drivekD.initDefault(0.0);
-    thetakP.initDefault(5.0);
+    thetakP.initDefault(4.0);
     thetakD.initDefault(0.0);
-    driveMaxVelocity.initDefault(Units.inchesToMeters(150.0));
-    driveMaxAcceleration.initDefault(Units.inchesToMeters(95.0));
+    driveMaxVelocity.initDefault(3.8);
+    driveMaxAcceleration.initDefault(3.0);
     thetaMaxVelocity.initDefault(Units.degreesToRadians(360.0));
-    thetaMaxAcceleration.initDefault(Units.degreesToRadians(720.0));
+    thetaMaxAcceleration.initDefault(8.0);
     driveTolerance.initDefault(0.01);
     thetaTolerance.initDefault(Units.degreesToRadians(1.0));
-    ffMinRadius.initDefault(0.2);
-    ffMaxRadius.initDefault(0.8);
+    ffMinRadius.initDefault(0.1);
+    ffMaxRadius.initDefault(0.15);
   }
 
   private final Drive drive;
@@ -206,8 +206,8 @@ public class DriveToPose extends Command {
             .getTranslation();
 
     // Scale feedback velocities by input ff
-    final double linearS = linearFF.get().getNorm();
-    final double thetaS = omegaFF.getAsDouble();
+    final double linearS = linearFF.get().getNorm() * 3.0;
+    final double thetaS = Math.abs(omegaFF.getAsDouble()) * 3.0;
     driveVelocity =
         driveVelocity.interpolate(linearFF.get().times(DriveConstants.maxLinearSpeed), linearS);
     thetaVelocity =

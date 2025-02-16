@@ -9,4 +9,10 @@ package org.littletonrobotics.frc2025.util;
 
 public class Container<T> {
   public T value;
+
+  public Container() {}
+
+  public Container(T initialValue) {
+    value = initialValue;
+  }
 }

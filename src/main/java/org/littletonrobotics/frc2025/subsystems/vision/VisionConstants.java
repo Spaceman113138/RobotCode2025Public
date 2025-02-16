@@ -20,8 +20,8 @@ public class VisionConstants {
   public static final double targetLogTimeSecs = 0.1;
   public static final double fieldBorderMargin = 0.5;
   public static final double zMargin = 0.75;
-  public static final double xyStdDevCoefficient = 0.005;
-  public static final double thetaStdDevCoefficient = 0.01;
+  public static final double xyStdDevCoefficient = 0.015;
+  public static final double thetaStdDevCoefficient = 0.03;
   public static final double demoTagPosePersistenceSecs = 0.5;
   public static final double objDetectConfidenceThreshold = 0.8;
   public static final LoggedTunableNumber timestampOffset =
@@ -37,6 +37,11 @@ public class VisionConstants {
         case DEVBOT ->
             new LoggedTunableNumber[] {
               new LoggedTunableNumber("Vision/PitchAdjust0", 0.0),
+              new LoggedTunableNumber("Vision/PitchAdjust1", 0.0)
+            };
+        case COMPBOT ->
+            new LoggedTunableNumber[] {
+              new LoggedTunableNumber("Vision/PitchAdjust0", 0.0),
               new LoggedTunableNumber("Vision/PitchAdjust1", 0.0),
               new LoggedTunableNumber("Vision/PitchAdjust2", 0.0),
               new LoggedTunableNumber("Vision/PitchAdjust3", 0.0)
@@ -46,6 +51,45 @@ public class VisionConstants {
   public static CameraConfig[] cameras =
       switch (Constants.getRobot()) {
         case DEVBOT ->
+            new CameraConfig[] {
+              CameraConfig.builder()
+                  .pose(
+                      () ->
+                          new Pose3d(
+                              0.2794,
+                              0.2286 - Units.inchesToMeters(1.0),
+                              0.21113,
+                              new Rotation3d(
+                                  0.0,
+                                  Units.degreesToRadians(-25.0 + pitchAdjustments[0].get()),
+                                  Units.degreesToRadians(-20.0))))
+                  .id("40265450")
+                  .width(1600)
+                  .height(1200)
+                  .exposure(monoExposure)
+                  .gain(monoGain)
+                  .stdDevFactor(1.0)
+                  .build(),
+              CameraConfig.builder()
+                  .pose(
+                      () ->
+                          new Pose3d(
+                              0.2794,
+                              -0.2286 + Units.inchesToMeters(1.0),
+                              0.21113,
+                              new Rotation3d(
+                                  0.0,
+                                  Units.degreesToRadians(-25.0 + pitchAdjustments[1].get()),
+                                  Units.degreesToRadians(20.0))))
+                  .id("40265453")
+                  .width(1600)
+                  .height(1200)
+                  .exposure(monoExposure)
+                  .gain(monoGain)
+                  .stdDevFactor(1.0)
+                  .build()
+            };
+        case COMPBOT ->
             new CameraConfig[] {
               CameraConfig.builder()
                   .pose(

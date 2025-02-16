@@ -13,6 +13,7 @@ import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.Notifier;
 import edu.wpi.first.wpilibj.Timer;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj.util.Color;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +41,8 @@ public class Leds extends VirtualSubsystem {
   public Optional<ReefLevel> secondPriorityLevel = Optional.empty();
   public boolean firstPriorityBlocked = false;
   public boolean secondPriorityBlocked = false;
+  public String hexColor = "";
+  public String secondaryHexColor = "";
 
   private Optional<Alliance> alliance = Optional.empty();
   private Color disabledColor = Color.kGold;
@@ -72,7 +75,7 @@ public class Leds extends VirtualSubsystem {
   private static final double autoFadeMaxTime = 5.0; // Return to normal
   private static final Color l1PriorityColor = Color.kYellow;
   private static final Color l2PriorityColor = Color.kGreen;
-  private static final Color l3PriorityColor = Color.kBlue;
+  private static final Color l3PriorityColor = Color.kCyan;
   private static final Color l4PriorityColor = Color.kMediumPurple;
 
   private Leds() {
@@ -185,7 +188,7 @@ public class Leds extends VirtualSubsystem {
 
     } else {
       // Strategy priorities
-      TriConsumer<Optional<ReefLevel>, Boolean, Section> renderPriority =
+      TriFunction<Optional<ReefLevel>, Boolean, Section, Color> renderPriority =
           (level, blocked, section) -> {
             Color primaryColor =
                 level.isEmpty()
@@ -197,17 +200,21 @@ public class Leds extends VirtualSubsystem {
                       case L4 -> l4PriorityColor;
                     };
             if (blocked == false) {
-              solid(section, primaryColor);
+              return solid(section, primaryColor);
             } else {
-              breath(
+              return breath(
                   section,
                   primaryColor,
                   Color.lerpRGB(primaryColor, Color.kBlack, 0.5),
                   breathFastDuration);
             }
           };
-      renderPriority.accept(firstPriorityLevel, firstPriorityBlocked, topSection);
-      renderPriority.accept(secondPriorityLevel, secondPriorityBlocked, bottomSection);
+      hexColor =
+          renderPriority.accept(firstPriorityLevel, firstPriorityBlocked, topSection).toHexString();
+      secondaryHexColor =
+          renderPriority
+              .accept(secondPriorityLevel, secondPriorityBlocked, bottomSection)
+              .toHexString();
 
       // Human player alert
       if (hpAttentionAlert) {
@@ -225,34 +232,41 @@ public class Leds extends VirtualSubsystem {
       solid(fullSection, Color.kRed);
     }
 
+    // Update dashboard
+    SmartDashboard.putString("LEDs/First Priority", hexColor);
+    SmartDashboard.putString("LEDs/Second Priority", secondaryHexColor);
+
     // Update LEDs
     leds.setData(buffer);
   }
 
-  private void solid(Section section, Color color) {
+  private Color solid(Section section, Color color) {
     if (color != null) {
       for (int i = section.start(); i < section.end(); i++) {
         buffer.setLED(i, color);
       }
     }
+    return color;
   }
 
-  private void strobe(Section section, Color c1, Color c2, double duration) {
+  private Color strobe(Section section, Color c1, Color c2, double duration) {
     boolean c1On = ((Timer.getFPGATimestamp() % duration) / duration) > 0.5;
-    solid(section, c1On ? c1 : c2);
+    return solid(section, c1On ? c1 : c2);
   }
 
-  private void breath(Section section, Color c1, Color c2, double duration, double timestamp) {
+  private Color breath(Section section, Color c1, Color c2, double duration, double timestamp) {
     double x = ((timestamp % duration) / duration) * 2.0 * Math.PI;
     double ratio = (Math.sin(x) + 1.0) / 2.0;
     double red = (c1.red * (1 - ratio)) + (c2.red * ratio);
     double green = (c1.green * (1 - ratio)) + (c2.green * ratio);
     double blue = (c1.blue * (1 - ratio)) + (c2.blue * ratio);
-    solid(section, new Color(red, green, blue));
+    var color = new Color(red, green, blue);
+    solid(section, color);
+    return color;
   }
 
-  private void breath(Section section, Color c1, Color c2, double duration) {
-    breath(section, c1, c2, duration, Timer.getTimestamp());
+  private Color breath(Section section, Color c1, Color c2, double duration) {
+    return breath(section, c1, c2, duration, Timer.getTimestamp());
   }
 
   private void wave(Section section, Color c1, Color c2, double cycleLength, double duration) {
@@ -288,7 +302,7 @@ public class Leds extends VirtualSubsystem {
   private static record Section(int start, int end) {}
 
   @FunctionalInterface
-  public interface TriConsumer<A, B, C> {
-    void accept(A a, B b, C c);
+  public interface TriFunction<A, B, C, D> {
+    D accept(A a, B b, C c);
   }
 }

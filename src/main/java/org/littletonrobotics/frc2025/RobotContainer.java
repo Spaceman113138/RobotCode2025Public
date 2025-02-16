@@ -7,8 +7,6 @@
 
 package org.littletonrobotics.frc2025;
 
-import edu.wpi.first.math.geometry.Pose2d;
-import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
@@ -24,12 +22,16 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.function.BiConsumer;
 import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 import lombok.experimental.ExtensionMethod;
+import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
+import org.littletonrobotics.frc2025.FieldConstants.ReefLevel;
 import org.littletonrobotics.frc2025.commands.*;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
+import org.littletonrobotics.frc2025.subsystems.objectivetracker.ObjectiveTracker;
+import org.littletonrobotics.frc2025.subsystems.objectivetracker.ReefControlsIO;
+import org.littletonrobotics.frc2025.subsystems.objectivetracker.ReefControlsIOServer;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
@@ -47,6 +49,7 @@ import org.littletonrobotics.frc2025.subsystems.vision.Vision;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
+import org.littletonrobotics.frc2025.util.Container;
 import org.littletonrobotics.frc2025.util.OverrideSwitches;
 import org.littletonrobotics.frc2025.util.TriggerUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
@@ -60,6 +63,7 @@ public class RobotContainer {
   private Vision vision;
   private final Superstructure superstructure;
   private RollerSystem funnel;
+  private ObjectiveTracker objectiveTracker;
   private final Leds leds = Leds.getInstance();
 
   // Controllers
@@ -129,13 +133,19 @@ public class RobotContainer {
                   new ModuleIODev(DriveConstants.moduleConfigsDev[1]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[2]),
                   new ModuleIODev(DriveConstants.moduleConfigsDev[3]));
+          vision =
+              new Vision(
+                  this::getSelectedAprilTagLayout,
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 0),
+                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 1));
           elevator = new Elevator(new ElevatorIOTalonFX());
           dispenser =
               new Dispenser(
                   new DispenserIO() {}, new RollerSystemIOSpark(5, true), new RollerSystemIO() {});
-          slam =
-              new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false, 1.0));
-          funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(4, false));
+          //   slam =
+          //       new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false,
+          // 1.0));
+          //   funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(4, false));
         }
         case SIMBOT -> {
           drive =
@@ -195,6 +205,11 @@ public class RobotContainer {
     if (funnel == null) {
       funnel = new RollerSystem("Funnel", new RollerSystemIO() {});
     }
+    objectiveTracker =
+        new ObjectiveTracker(
+            Constants.getMode() == Mode.REPLAY
+                ? new ReefControlsIO() {}
+                : new ReefControlsIOServer());
     superstructure = new Superstructure(elevator, dispenser, slam);
 
     // Set up auto routines
@@ -267,56 +282,67 @@ public class RobotContainer {
         DriveCommands.joystickDrive(
             drive, driveLinearX, driveLinearY, driveTheta, robotRelative.getAsBoolean()));
 
-    // Reset gyro to 0° when B button is pressed
-    driver
-        .b()
-        .onTrue(
-            Commands.runOnce(
-                    () ->
-                        RobotState.getInstance()
-                            .resetPose(
-                                new Pose2d(
-                                    RobotState.getInstance().getEstimatedPose().getTranslation(),
-                                    AllianceFlipUtil.apply(new Rotation2d()))),
-                    drive)
-                .ignoringDisable(true));
-
-    Supplier<Command> superstructureGetBackCommandFactory =
-        () ->
-            superstructure
-                .runGoal(superstructure::getState)
-                .until(
-                    () -> {
-                      var robot =
-                          AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose());
-                      return robot.getTranslation().getDistance(FieldConstants.Reef.center)
-                          >= FieldConstants.Reef.faceLength
-                              + DriveConstants.robotWidth / 2.0
-                              + AutoScore.minDistanceReefClear.get();
-                    })
-                .withName("Superstructure Get Back!");
+    Container<ReefLevel> firstPriorityReefLevel = new Container<>();
     driver
         .rightTrigger()
+        .and(
+            () ->
+                objectiveTracker
+                    .getLevel(false)
+                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
+                    .isPresent())
+        .onTrue(
+            Commands.runOnce(
+                () -> firstPriorityReefLevel.value = objectiveTracker.getLevel(false).get()))
         .whileTrue(
             AutoScore.getAutoScoreCommand(
-                drive,
-                superstructure,
-                () -> new FieldConstants.CoralObjective(1, FieldConstants.ReefLevel.L4),
-                driveLinearX,
-                driveLinearY,
-                driveTheta))
-        .onFalse(superstructureGetBackCommandFactory.get());
+                    drive,
+                    superstructure,
+                    objectiveTracker::requestScored,
+                    () -> firstPriorityReefLevel.value,
+                    () -> objectiveTracker.getCoralObjective(firstPriorityReefLevel.value),
+                    driveLinearX,
+                    driveLinearY,
+                    driveTheta)
+                .withName("Auto Score Priority #1"));
+    Container<ReefLevel> secondPriorityReefLevel = new Container<>();
+    driver
+        .rightBumper()
+        .and(
+            () ->
+                objectiveTracker
+                    .getLevel(true)
+                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
+                    .isPresent())
+        .onTrue(
+            Commands.runOnce(
+                () -> secondPriorityReefLevel.value = objectiveTracker.getLevel(true).get()))
+        .whileTrue(
+            AutoScore.getAutoScoreCommand(
+                    drive,
+                    superstructure,
+                    objectiveTracker::requestScored,
+                    () -> secondPriorityReefLevel.value,
+                    () -> objectiveTracker.getCoralObjective(secondPriorityReefLevel.value),
+                    driveLinearX,
+                    driveLinearY,
+                    driveTheta)
+                .withName("Auto Score Priority #2"));
     driver
         .leftBumper()
         .whileTrue(
-            AutoScore.getReefIntakeCommand(
-                drive,
-                superstructure,
-                () -> new FieldConstants.AlgaeObjective(1),
-                driveLinearX,
-                driveLinearY,
-                driveTheta))
-        .onFalse(superstructureGetBackCommandFactory.get());
+            Commands.waitUntil(() -> !superstructure.hasAlgae())
+                .andThen(
+                    AutoScore.getReefIntakeCommand(
+                        drive,
+                        superstructure,
+                        objectiveTracker::requestAlgaeIntaked,
+                        objectiveTracker::getAlgaeObjective,
+                        driveLinearX,
+                        driveLinearY,
+                        driveTheta))
+                .onlyIf(() -> objectiveTracker.getAlgaeObjective().isPresent())
+                .withName("Algae Reef Intake"));
 
     // Operator command for algae intake
     operator
@@ -330,7 +356,7 @@ public class RobotContainer {
     operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
 
     // Operator commands for superstructure
-    BiConsumer<Trigger, FieldConstants.ReefLevel> bindOperatorCoralScore =
+    BiConsumer<Trigger, ReefLevel> bindOperatorCoralScore =
         (faceButton, height) -> {
           faceButton.whileTrueContinuous(
               superstructure
@@ -348,10 +374,10 @@ public class RobotContainer {
                                   height, superstructure.hasAlgae(), true))
                       .withName("Operator Score & Eject On " + height));
         };
-    bindOperatorCoralScore.accept(operator.a(), FieldConstants.ReefLevel.L1);
-    bindOperatorCoralScore.accept(operator.x(), FieldConstants.ReefLevel.L2);
-    bindOperatorCoralScore.accept(operator.b(), FieldConstants.ReefLevel.L3);
-    bindOperatorCoralScore.accept(operator.y(), FieldConstants.ReefLevel.L4);
+    bindOperatorCoralScore.accept(operator.a(), ReefLevel.L1);
+    bindOperatorCoralScore.accept(operator.x(), ReefLevel.L2);
+    bindOperatorCoralScore.accept(operator.b(), ReefLevel.L3);
+    bindOperatorCoralScore.accept(operator.y(), ReefLevel.L4);
 
     // Strobe LEDs at human player
     driver
