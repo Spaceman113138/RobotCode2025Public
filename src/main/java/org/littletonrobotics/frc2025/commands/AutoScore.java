@@ -390,11 +390,8 @@ public class AutoScore extends SequentialCommandGroup {
   public static Pose2d getReefIntakePose(AlgaeObjective objective) {
     var dispenserPose = DispenserPose.fromAlgaeObjective(objective);
     int branchId = objective.id() * 2;
-    return Reef.branchPositions
-        .get(branchId)
-        .get(ReefLevel.L3)
-        .toPose2d()
-        .interpolate(Reef.branchPositions.get(branchId + 1).get(ReefLevel.L3).toPose2d(), 0.5)
+    return getBranchPose(new CoralObjective(branchId, ReefLevel.L3))
+        .interpolate(getBranchPose(new CoralObjective(branchId + 1, ReefLevel.L3)), 0.5)
         .transformBy(
             GeomUtil.toTransform2d(
                 dispenserPose.getElevatorHeight() * SuperstructureConstants.elevatorAngle.getCos()
@@ -443,6 +440,6 @@ public class AutoScore extends SequentialCommandGroup {
   }
 
   public static Pose2d getBranchPose(CoralObjective objective) {
-    return Reef.branchPositions.get(objective.branchId()).get(objective.reefLevel()).toPose2d();
+    return Reef.branchPositions2d.get(objective.branchId()).get(objective.reefLevel());
   }
 }

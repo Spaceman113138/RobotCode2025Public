@@ -56,8 +56,8 @@ public class VisionConstants {
                   .pose(
                       () ->
                           new Pose3d(
-                              0.2794,
-                              0.2286 - Units.inchesToMeters(1.0),
+                              0.254,
+                              0.2032,
                               0.21113,
                               new Rotation3d(
                                   0.0,
@@ -74,8 +74,8 @@ public class VisionConstants {
                   .pose(
                       () ->
                           new Pose3d(
-                              0.2794,
-                              -0.2286 + Units.inchesToMeters(1.0),
+                              0.254,
+                              -0.2032,
                               0.21113,
                               new Rotation3d(
                                   0.0,

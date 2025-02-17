@@ -82,8 +82,8 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     followerSupplyCurrent = followerTalon.getSupplyCurrent();
     followerTemp = followerTalon.getDeviceTemp();
 
-    BaseStatusSignal.setUpdateFrequencyForAll(
-        50.0, position, velocity, appliedVolts, torqueCurrent, temp);
+    BaseStatusSignal.setUpdateFrequencyForAll(50.0, position, velocity, appliedVolts, temp);
+    torqueCurrent.setUpdateFrequency(1000);
     ParentDevice.optimizeBusUtilizationForAll(talon);
   }
 

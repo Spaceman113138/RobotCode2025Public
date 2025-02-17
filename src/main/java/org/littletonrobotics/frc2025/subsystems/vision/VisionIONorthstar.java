@@ -60,7 +60,7 @@ public class VisionIONorthstar implements VisionIO {
                 new double[] {},
                 PubSubOption.keepDuplicates(true),
                 PubSubOption.sendAll(true),
-                PubSubOption.periodic(0.005));
+                PubSubOption.periodic(0.01));
     demoObservationSubscriber =
         outputTable
             .getDoubleArrayTopic("demo_observations")
@@ -68,7 +68,7 @@ public class VisionIONorthstar implements VisionIO {
                 new double[] {},
                 PubSubOption.keepDuplicates(true),
                 PubSubOption.sendAll(true),
-                PubSubOption.periodic(0.005));
+                PubSubOption.periodic(0.01));
     objDetectObservationSubscriber =
         outputTable
             .getDoubleArrayTopic("objdetect_observations")
@@ -76,7 +76,7 @@ public class VisionIONorthstar implements VisionIO {
                 new double[] {},
                 PubSubOption.keepDuplicates(true),
                 PubSubOption.sendAll(true),
-                PubSubOption.periodic(0.005));
+                PubSubOption.periodic(0.01));
     fpsAprilTagsSubscriber = outputTable.getIntegerTopic("fps_apriltags").subscribe(0);
     fpsObjDetectSubscriber = outputTable.getIntegerTopic("fps_objdetect").subscribe(0);
 

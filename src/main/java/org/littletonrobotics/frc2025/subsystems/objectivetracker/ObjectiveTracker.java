@@ -55,27 +55,31 @@ public class ObjectiveTracker extends VirtualSubsystem {
 
   private final ReefControlsIO io;
   private final ReefControlsIOInputsAutoLogged inputs = new ReefControlsIOInputsAutoLogged();
-  private int previousLevel1State = 0;
-  private final int[] previousLevelStates = new int[] {0, 0, 0};
-  private int previousAlgaeState = 63;
 
-  private boolean firstCycle = true;
-  private ReefState reefState;
+  private ReefState reefState = ReefState.initial;
   private ReefState previousReefState;
   private boolean coopState = false;
+  private int selectedLevel = 0;
   private boolean lastCoopState = false;
+
   private final Set<CoralObjective> availableBranches = new HashSet<>();
   private final Set<CoralObjective> availableUnblockedBranches = new HashSet<>();
+  private final Set<CoralObjective> nearbyBranches = new HashSet<>();
+  private final Set<CoralObjective> nearbyUnblockedBranches = new HashSet<>();
+
   private final Set<AlgaeObjective> presentAlgae = new HashSet<>();
-  @Getter private Optional<AlgaeObjective> algaeObjective;
 
   private List<CoralPriority> fullStrategy = new ArrayList<>();
   private final List<CoralPriority> uncompletedPriorities = new ArrayList<>();
   private List<CoralPriority> openPriorities = new ArrayList<>();
 
+  @Getter private Optional<ReefLevel> firstLevel = Optional.empty();
+  @Getter private Optional<ReefLevel> secondLevel = Optional.empty();
+  @Getter private Optional<AlgaeObjective> algaeObjective;
+
   private final LoggedNetworkString strategyInput =
       new LoggedNetworkString("/SmartDashboard/Strategy", "545352514321");
-  private String previousStrategy = "";
+  private String previousStrategy = null;
   private final StringPublisher[] strategyNamesPublishers = new StringPublisher[8];
   private final StringPublisher[] strategyCompletedPublishers = new StringPublisher[8];
   private final LoggedDashboardChooser<String> dashboardLevelChooser =
@@ -113,66 +117,39 @@ public class ObjectiveTracker extends VirtualSubsystem {
 
     // Update strategy when input changed
     boolean strategyChanged = false;
-    if (!strategyInput.get().equals(previousStrategy) || firstCycle) {
+    if (!strategyInput.get().equals(previousStrategy)) {
       strategyChanged = true;
       parseStrategy();
     }
 
-    final int[] inputLevelStates =
-        new int[] {inputs.level2State, inputs.level3State, inputs.level4State};
-    if (firstCycle) {
-      previousLevel1State = inputs.level1State;
-      previousLevelStates[0] = inputs.level2State;
-      previousLevelStates[1] = inputs.level3State;
-      previousLevelStates[2] = inputs.level4State;
-      previousAlgaeState = inputs.algaeState;
-      coopState = inputs.coopState;
-
-      // Serialize state into reef state object
-      boolean[][] coralState = new boolean[3][12];
-      for (int level = 0; level < 3; level++) {
-        for (int i = 0; i < 12; i++) {
-          coralState[level][i] = (inputLevelStates[level] & (1 << i)) != 0;
-        }
-      }
-      boolean[] algaeState = new boolean[6];
-      for (int i = 0; i < 6; i++) {
-        algaeState[i] = (inputs.algaeState & (1 << i)) != 0;
-      }
-      reefState = new ReefState(coralState, algaeState, inputs.level1State);
+    // Update reef state from inputs
+    if (inputs.level1State.length > 0) {
+      reefState = new ReefState(reefState.coral(), reefState.algae(), inputs.level1State[0]);
     }
-
-    if (inputs.level1State != previousLevel1State && !firstCycle) {
-      reefState = new ReefState(reefState.coral(), reefState.algae(), inputs.level1State);
-      previousLevel1State = inputs.level1State;
-    }
+    final int[][] inputLevelStates =
+        new int[][] {inputs.level2State, inputs.level3State, inputs.level4State};
     for (int i = 0; i < 3; i++) {
-      if (inputLevelStates[i] != previousLevelStates[i] && !firstCycle) {
-        previousLevelStates[i] = inputLevelStates[i];
+      if (inputLevelStates[i].length > 0) {
         boolean[] levelState = new boolean[12];
         for (int j = 0; j < 12; j++) {
-          levelState[j] = (inputLevelStates[i] & (1 << j)) != 0;
+          levelState[j] = (inputLevelStates[i][0] & (1 << j)) != 0;
         }
         reefState.coral()[i] = levelState;
       }
     }
-    if (inputs.algaeState != previousAlgaeState && !firstCycle) {
-      previousAlgaeState = inputs.algaeState;
+    if (inputs.algaeState.length > 0) {
       boolean[] algae = new boolean[6];
       for (int j = 0; j < 6; j++) {
-        algae[j] = (inputs.algaeState & (1 << j)) != 0;
+        algae[j] = (inputs.algaeState[0] & (1 << j)) != 0;
       }
       reefState = new ReefState(reefState.coral(), algae, reefState.troughCount());
     }
-    if (inputs.coopState != coopState && !firstCycle) {
-      coopState = inputs.coopState;
+    if (inputs.coopState.length > 0) {
+      coopState = inputs.coopState[0];
     }
 
     // If state has changed, recalculate
-    if (!reefState.equals(previousReefState)
-        || coopState != lastCoopState
-        || strategyChanged
-        || firstCycle) {
+    if (!reefState.equals(previousReefState) || coopState != lastCoopState || strategyChanged) {
       previousReefState = reefState.clone();
       lastCoopState = coopState;
 
@@ -229,7 +206,7 @@ public class ObjectiveTracker extends VirtualSubsystem {
                               return index == -1 ? Integer.MAX_VALUE : index;
                             })
                         .reversed())
-                .sorted(
+                .min(
                     Comparator.comparingInt(
                         priority -> {
                           if (priority.getLevel() == ReefLevel.L1) return reefState.troughCount;
@@ -238,8 +215,7 @@ public class ObjectiveTracker extends VirtualSubsystem {
                             if (reefState.coral[priority.getLevel().ordinal() - 1][i]) count++;
                           }
                           return count;
-                        }))
-                .findFirst();
+                        }));
       }
 
       for (int i = 0; i < fullStrategy.size(); i++) {
@@ -323,7 +299,10 @@ public class ObjectiveTracker extends VirtualSubsystem {
     }
 
     // Publish state to dashboard
-    io.setSelectedLevel(inputs.selectedLevel);
+    if (inputs.selectedLevel.length > 0) {
+      selectedLevel = inputs.selectedLevel[0];
+    }
+    io.setSelectedLevel(selectedLevel);
     io.setLevel1State(reefState.troughCount());
     final int[] levelStates = new int[] {0, 0, 0};
     for (int i = 0; i < 3; i++) {
@@ -347,47 +326,79 @@ public class ObjectiveTracker extends VirtualSubsystem {
 
     // Calculate predicted robot
     predictedRobot =
-        RobotState.getInstance()
-            .getEstimatedPose()
-            .exp(RobotState.getInstance().getRobotVelocity().toTwist2d(lookaheadS.get()));
-    final Pose2d flippedPredictedPose = AllianceFlipUtil.apply(predictedRobot);
+        AllianceFlipUtil.apply(
+            RobotState.getInstance()
+                .getEstimatedPose()
+                .exp(RobotState.getInstance().getRobotVelocity().toTwist2d(lookaheadS.get())));
+
+    // Calculate nearby branches that do not have coral on them
+    nearbyBranches.clear();
+    availableBranches.stream()
+        .filter(
+            objective ->
+                Math.abs(
+                        predictedRobot
+                            .relativeTo(AutoScore.getBranchPose(objective))
+                            .getTranslation()
+                            .getAngle()
+                            .getDegrees())
+                    <= 100.0)
+        .forEach(nearbyBranches::add);
 
     // Calculate current open priorities in order
-    openPriorities =
-        uncompletedPriorities.stream()
-            .filter(
-                priority ->
-                    !priority.getAvailableCoral(flippedPredictedPose, availableBranches).isEmpty())
-            .toList();
+    openPriorities.clear();
+    int count = 0;
+    for (var priority : uncompletedPriorities) {
+      if (openPriorities.stream()
+              .noneMatch(objective -> priority.getLevel() == objective.getLevel())
+          && nearbyBranches.stream()
+              .anyMatch(objective -> priority.getLevel() == objective.reefLevel())) {
+        openPriorities.add(priority);
+        count++;
+      }
+      if (count == 2) break;
+    }
     Logger.recordOutput(
         "ObjectiveTracker/Strategy/OpenPriorities", openPriorities.toArray(CoralPriority[]::new));
+
+    // Get first and second level priorities
+    firstLevel = getLevel(false);
+    secondLevel = getLevel(true);
+
+    // Calculate the unblocked nearby branches
+    nearbyUnblockedBranches.clear();
+    nearbyBranches.stream()
+        .filter(availableUnblockedBranches::contains)
+        .forEach(nearbyUnblockedBranches::add);
+
     // Show strategy on LEDs
-    Leds.getInstance().firstPriorityLevel = getLevel(false);
-    Leds.getInstance().secondPriorityLevel = getLevel(true);
+    Leds.getInstance().firstPriorityLevel = firstLevel;
+    Leds.getInstance().secondPriorityLevel = secondLevel;
     Leds.getInstance().firstPriorityBlocked =
-        !openPriorities.isEmpty()
-            && openPriorities
-                .get(0)
-                .getAvailableCoral(flippedPredictedPose, availableUnblockedBranches)
-                .isEmpty();
+        firstLevel
+            .map(
+                reefLevel ->
+                    nearbyUnblockedBranches.stream()
+                        .noneMatch(objective -> reefLevel == objective.reefLevel()))
+            .orElse(true);
     Leds.getInstance().secondPriorityBlocked =
-        openPriorities.size() <= 1
-            || openPriorities
-                .get(1)
-                .getAvailableCoral(flippedPredictedPose, availableUnblockedBranches)
-                .isEmpty();
+        secondLevel
+            .map(
+                reefLevel ->
+                    nearbyUnblockedBranches.stream()
+                        .noneMatch(objective -> reefLevel == objective.reefLevel()))
+            .orElse(true);
 
     // Get nearest algae objective
     algaeObjective =
         presentAlgae.stream()
             .filter(
                 objective ->
-                    flippedPredictedPose.relativeTo(AutoScore.getReefIntakePose(objective)).getX()
-                        <= 0.1)
+                    predictedRobot.relativeTo(AutoScore.getReefIntakePose(objective)).getX() <= 0.1)
             .min(
                 Comparator.comparingDouble(
                     objective ->
-                        flippedPredictedPose
+                        predictedRobot
                             .getTranslation()
                             .getDistance(AutoScore.getReefIntakePose(objective).getTranslation())));
     algaeObjective.ifPresentOrElse(
@@ -397,9 +408,6 @@ public class ObjectiveTracker extends VirtualSubsystem {
         () ->
             Logger.recordOutput(
                 "ObjectiveTracker/Strategy/AlgaeObjective", new AlgaeObjective[] {}));
-
-    // Reset first cycle indicator
-    firstCycle = false;
   }
 
   public Command requestScored(Supplier<CoralObjective> coralObjective) {
@@ -421,31 +429,24 @@ public class ObjectiveTracker extends VirtualSubsystem {
     return Commands.runOnce(() -> reefState.algae()[algaeObjective.get().id()] = false);
   }
 
-  public Optional<ReefLevel> getLevel(boolean secondPriority) {
+  private Optional<ReefLevel> getLevel(boolean secondPriority) {
     if (!dashboardLevelChooser.get().equals("Auto")) {
       return Optional.of(ReefLevel.valueOf(dashboardLevelChooser.get()));
     }
-    var list = openPriorities.stream().map(CoralPriority::getLevel).distinct().toList();
     if (!secondPriority) {
-      return list.stream().findFirst();
+      return !openPriorities.isEmpty()
+          ? Optional.of(openPriorities.get(0).getLevel())
+          : Optional.empty();
     } else {
-      if (list.size() < 2) {
-        return Optional.empty();
-      }
-      return Optional.of(list.get(1));
+      if (openPriorities.size() < 2) return Optional.empty();
+      return Optional.of(openPriorities.get(1).getLevel());
     }
   }
 
   public Optional<CoralObjective> getCoralObjective(ReefLevel level) {
-    Pose2d flippedRobot = AllianceFlipUtil.apply(predictedRobot);
-    return openPriorities.stream()
-        .filter(priority -> priority.getLevel() == level)
-        .findFirst()
-        .flatMap(
-            coralPriority ->
-                coralPriority.getAvailableCoral(flippedRobot, availableBranches).stream()
-                    .filter(availableUnblockedBranches::contains)
-                    .min(nearestCoralObjectiveComparator(flippedRobot)));
+    return nearbyUnblockedBranches.stream()
+        .filter(objective -> objective.reefLevel() == level)
+        .min(nearestCoralObjectiveComparator(predictedRobot));
   }
 
   private static final Set<Character> allowedCharacters = Set.of('1', '2', '3', '4', '5');
@@ -531,22 +532,6 @@ public class ObjectiveTracker extends VirtualSubsystem {
       }
       return count >= 5;
     }
-
-    public Set<CoralObjective> getAvailableCoral(
-        Pose2d flippedRobot, Set<CoralObjective> availableBranches) {
-      return availableBranches.stream()
-          .filter(
-              objective ->
-                  Math.abs(
-                              flippedRobot
-                                  .relativeTo(AutoScore.getBranchPose(objective))
-                                  .getTranslation()
-                                  .getAngle()
-                                  .getDegrees())
-                          <= 100.0
-                      && objective.reefLevel() == level) // In front of branch
-          .collect(Collectors.toSet());
-    }
   }
 
   private static void logAvailableBranches(Set<CoralObjective> availableBranches, String key) {
@@ -573,7 +558,23 @@ public class ObjectiveTracker extends VirtualSubsystem {
                 .getDistance(AutoScore.getCoralScorePose(coralObjective, false).getTranslation()));
   }
 
-  public record ReefState(boolean[][] coral, boolean[] algae, int troughCount) {
+  private record ReefState(boolean[][] coral, boolean[] algae, int troughCount) {
+    public static final ReefState initial =
+        new ReefState(
+            new boolean[][] {
+              new boolean[] {
+                false, false, false, false, false, false, false, false, false, false, false, false
+              },
+              new boolean[] {
+                false, false, false, false, false, false, false, false, false, false, false, false
+              },
+              new boolean[] {
+                false, false, false, false, false, false, false, false, false, false, false, false
+              }
+            },
+            new boolean[] {true, true, true, true, true, true},
+            0);
+
     @Override
     public boolean equals(Object o) {
       if (!(o instanceof ReefState reefState)) return false;

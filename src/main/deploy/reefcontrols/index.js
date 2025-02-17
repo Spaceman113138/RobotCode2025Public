@@ -252,3 +252,49 @@ window.addEventListener("load", () => {
     ntClient.addSample(toRobotPrefix + coopTopicName, !coopState);
   });
 });
+
+// ***** REEF CANVAS *****
+
+window.addEventListener("load", () => {
+  const canvas = document.getElementsByTagName("canvas")[0];
+  const context = canvas.getContext("2d");
+
+  let render = () => {
+    const devicePixelRatio = window.devicePixelRatio;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    canvas.width = width * devicePixelRatio;
+    canvas.height = height * devicePixelRatio;
+    context.scale(devicePixelRatio, devicePixelRatio);
+    context.clearRect(0, 0, width, height);
+
+    const corners = [
+      [width * 0.74, height * 0.9],
+      [width * 0.26, height * 0.9],
+      [width * 0.03, height * 0.5],
+      [width * 0.26, height * 0.1],
+      [width * 0.74, height * 0.1],
+      [width * 0.97, height * 0.5],
+    ];
+
+    context.beginPath();
+    corners.forEach((corner, index) => {
+      context.moveTo(width * 0.5, height * 0.5);
+      context.lineTo(...corner);
+    });
+    corners.forEach((corner, index) => {
+      if (index == 0) {
+        context.moveTo(...corner);
+      } else {
+        context.lineTo(...corner);
+      }
+    });
+    context.closePath();
+
+    context.strokeStyle = "black";
+    context.stroke();
+  };
+
+  render();
+  window.addEventListener("resize", render);
+});

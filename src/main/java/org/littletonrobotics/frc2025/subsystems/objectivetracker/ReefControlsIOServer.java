@@ -85,27 +85,22 @@ public class ReefControlsIOServer implements ReefControlsIO {
 
   @Override
   public void updateInputs(ReefControlsIOInputs inputs) {
-    for (long value : selectedLevelIn.readQueueValues()) {
-      inputs.selectedLevel = (int) value;
-    }
-    for (long value : l1StateIn.readQueueValues()) {
-      inputs.level1State = (int) value;
-    }
-    for (long value : l2StateIn.readQueueValues()) {
-      inputs.level2State = (int) value;
-    }
-    for (long value : l3StateIn.readQueueValues()) {
-      inputs.level3State = (int) value;
-    }
-    for (long value : l4StateIn.readQueueValues()) {
-      inputs.level4State = (int) value;
-    }
-    for (long value : algaeStateIn.readQueueValues()) {
-      inputs.algaeState = (int) value;
-    }
-    for (boolean value : coopStateIn.readQueueValues()) {
-      inputs.coopState = value;
-    }
+    inputs.selectedLevel =
+        selectedLevelIn.readQueue().length > 0
+            ? new int[] {(int) selectedLevelIn.get()}
+            : new int[] {};
+    inputs.level1State =
+        l1StateIn.readQueue().length > 0 ? new int[] {(int) l1StateIn.get()} : new int[] {};
+    inputs.level2State =
+        l2StateIn.readQueue().length > 0 ? new int[] {(int) l2StateIn.get()} : new int[] {};
+    inputs.level3State =
+        l3StateIn.readQueue().length > 0 ? new int[] {(int) l3StateIn.get()} : new int[] {};
+    inputs.level4State =
+        l4StateIn.readQueue().length > 0 ? new int[] {(int) l4StateIn.get()} : new int[] {};
+    inputs.algaeState =
+        algaeStateIn.readQueue().length > 0 ? new int[] {(int) algaeStateIn.get()} : new int[] {};
+    inputs.coopState =
+        coopStateIn.readQueue().length > 0 ? new boolean[] {coopStateIn.get()} : new boolean[] {};
   }
 
   @Override

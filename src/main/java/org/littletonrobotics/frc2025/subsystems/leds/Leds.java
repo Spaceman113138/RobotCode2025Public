@@ -74,7 +74,7 @@ public class Leds extends VirtualSubsystem {
   private static final double autoFadeTime = 2.5; // 3s nominal
   private static final double autoFadeMaxTime = 5.0; // Return to normal
   private static final Color l1PriorityColor = Color.kYellow;
-  private static final Color l2PriorityColor = Color.kGreen;
+  private static final Color l2PriorityColor = Color.kLime;
   private static final Color l3PriorityColor = Color.kCyan;
   private static final Color l4PriorityColor = Color.kMediumPurple;
 

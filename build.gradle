@@ -242,7 +242,7 @@ spotless {
     java {
         target fileTree(".") {
             include "src/**/*.java"
-            exclude "**/build/**", "**/build-*/**", "src/main/java/org/littletonrobotics/frc2025/BuildConstants.java", "northstar/**"
+            exclude "**/build/**", "**/build-*/**", "src/main/java/org/littletonrobotics/frc2025/BuildConstants.java", "northstar/**", "src/main/java/org/littletonrobotics/frc2025/util/rlog/**"
         }
         toggleOffOn()
         googleJavaFormat()

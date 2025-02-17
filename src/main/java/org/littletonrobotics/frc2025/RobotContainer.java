@@ -11,6 +11,7 @@ import edu.wpi.first.math.system.plant.DCMotor;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
+import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.GenericHID;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
 import edu.wpi.first.wpilibj.XboxController;
@@ -73,8 +74,8 @@ public class RobotContainer {
   private final Trigger robotRelative = overrides.driverSwitch(0);
   private final Trigger superstructureDisable = overrides.driverSwitch(1);
   private final Trigger superstructureCoast = overrides.driverSwitch(2);
-  private final Trigger aprilTagsBlueReef = overrides.multiDirectionSwitchLeft();
-  private final Trigger aprilTagsRedReef = overrides.multiDirectionSwitchRight();
+  private final Trigger aprilTagsReef = overrides.multiDirectionSwitchLeft();
+  private final Trigger aprilTagFieldBorder = overrides.multiDirectionSwitchRight();
   private final Alert aprilTagLayoutAlert = new Alert("", AlertType.kInfo);
   private final Alert driverDisconnected =
       new Alert("Driver controller disconnected (port 0).", AlertType.kWarning);
@@ -279,21 +280,20 @@ public class RobotContainer {
 
     // Default command, normal field-relative drive
     drive.setDefaultCommand(
-        DriveCommands.joystickDrive(
-            drive, driveLinearX, driveLinearY, driveTheta, robotRelative.getAsBoolean()));
+        DriveCommands.joystickDrive(drive, driveLinearX, driveLinearY, driveTheta, robotRelative));
 
     Container<ReefLevel> firstPriorityReefLevel = new Container<>();
     driver
-        .rightTrigger()
+        .a()
         .and(
             () ->
                 objectiveTracker
-                    .getLevel(false)
+                    .getFirstLevel()
                     .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
                     .isPresent())
         .onTrue(
             Commands.runOnce(
-                () -> firstPriorityReefLevel.value = objectiveTracker.getLevel(false).get()))
+                () -> firstPriorityReefLevel.value = objectiveTracker.getFirstLevel().get()))
         .whileTrue(
             AutoScore.getAutoScoreCommand(
                     drive,
@@ -307,16 +307,16 @@ public class RobotContainer {
                 .withName("Auto Score Priority #1"));
     Container<ReefLevel> secondPriorityReefLevel = new Container<>();
     driver
-        .rightBumper()
+        .b()
         .and(
             () ->
                 objectiveTracker
-                    .getLevel(true)
+                    .getSecondLevel()
                     .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
                     .isPresent())
         .onTrue(
             Commands.runOnce(
-                () -> secondPriorityReefLevel.value = objectiveTracker.getLevel(true).get()))
+                () -> secondPriorityReefLevel.value = objectiveTracker.getSecondLevel().get()))
         .whileTrue(
             AutoScore.getAutoScoreCommand(
                     drive,
@@ -329,7 +329,7 @@ public class RobotContainer {
                     driveTheta)
                 .withName("Auto Score Priority #2"));
     driver
-        .leftBumper()
+        .x()
         .whileTrue(
             Commands.waitUntil(() -> !superstructure.hasAlgae())
                 .andThen(
@@ -354,6 +354,9 @@ public class RobotContainer {
 
     // Operator command for coral intake
     operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
+
+    // Operator command for homing elevator
+    operator.leftBumper().onTrue(superstructure.runHomingSequence());
 
     // Operator commands for superstructure
     BiConsumer<Trigger, ReefLevel> bindOperatorCoralScore =
@@ -451,10 +454,14 @@ public class RobotContainer {
 
   /** Returns the current AprilTag layout type. */
   public AprilTagLayoutType getSelectedAprilTagLayout() {
-    if (aprilTagsBlueReef.getAsBoolean()) {
-      return FieldConstants.AprilTagLayoutType.BLUE_REEF;
-    } else if (aprilTagsRedReef.getAsBoolean()) {
-      return FieldConstants.AprilTagLayoutType.RED_REEF;
+    if (aprilTagsReef.getAsBoolean()) {
+      if (DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue) {
+        return FieldConstants.AprilTagLayoutType.BLUE_REEF;
+      } else {
+        return FieldConstants.AprilTagLayoutType.RED_REEF;
+      }
+    } else if (aprilTagFieldBorder.getAsBoolean()) {
+      return FieldConstants.AprilTagLayoutType.FIELD_BORDER;
     } else {
       return FieldConstants.defaultAprilTagType;
     }

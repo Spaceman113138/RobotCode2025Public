@@ -80,13 +80,11 @@ if __name__ == "__main__":
         remote_config_source.update(config)
         timestamp = time.time()
         success, image = capture.get_frame(config)
-        if not success:
-            time.sleep(0.5)
-            continue
 
         # Start and stop recording
         should_record = (
-            config.remote_config.is_recording
+            success
+            and config.remote_config.is_recording
             and config.remote_config.camera_resolution_width > 0
             and config.remote_config.camera_resolution_height > 0
             and config.remote_config.timestamp > 0
@@ -98,6 +96,11 @@ if __name__ == "__main__":
             print("Stopping recording")
             video_writer.stop()
         was_recording = should_record
+
+        # Exit if no frame
+        if not success:
+            time.sleep(0.5)
+            continue
 
         if calibration_command_source.get_calibrating(config):
             # Calibration mode
@@ -183,8 +186,9 @@ if __name__ == "__main__":
             if config.remote_config.is_recording:
                 if len(video_frame_cache) >= 2:
                     # Delay output by two frames to improve alignment with overlays
-                    video_writer.write_frame(timestamp, video_frame_cache.pop(
-                        0), last_image_observations, last_objdetect_observations)
+                    video_writer.write_frame(
+                        timestamp, video_frame_cache.pop(0), last_image_observations, last_objdetect_observations
+                    )
                 video_frame_cache.append(image)
             else:
                 video_frame_cache = []

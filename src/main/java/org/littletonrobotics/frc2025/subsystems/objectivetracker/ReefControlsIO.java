@@ -12,13 +12,13 @@ import org.littletonrobotics.junction.AutoLog;
 public interface ReefControlsIO {
   @AutoLog
   class ReefControlsIOInputs {
-    public int selectedLevel = 0; // 0 = L2, 1 = L3, 2 = L4
-    public int level1State = 0; // Count
-    public int level2State = 0; // Bitfield
-    public int level3State = 0; // Bitfield
-    public int level4State = 0; // Bitfield
-    public int algaeState = (1 << 6) - 1; // Bitfield
-    public boolean coopState = false; // Boolean
+    public int[] selectedLevel = new int[] {}; // 0 = L2, 1 = L3, 2 = L4
+    public int[] level1State = new int[] {}; // Count
+    public int[] level2State = new int[] {}; // Bitfield
+    public int[] level3State = new int[] {}; // Bitfield
+    public int[] level4State = new int[] {}; // Bitfield
+    public int[] algaeState = new int[] {}; // Bitfield
+    public boolean[] coopState = new boolean[] {}; // Boolean
   }
 
   default void updateInputs(ReefControlsIOInputs inputs) {}

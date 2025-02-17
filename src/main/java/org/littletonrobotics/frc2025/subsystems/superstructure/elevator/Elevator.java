@@ -36,9 +36,21 @@ public class Elevator {
   // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Elevator/kP");
   private static final LoggedTunableNumber kD = new LoggedTunableNumber("Elevator/kD");
-  private static final LoggedTunableNumber kS = new LoggedTunableNumber("Elevator/kS");
-  private static final LoggedTunableNumber kG = new LoggedTunableNumber("Elevator/kG");
-  private static final LoggedTunableNumber kA = new LoggedTunableNumber("Elevator/kA");
+  private static final LoggedTunableNumber[] kS = {
+    new LoggedTunableNumber("Elevator/kS/Stage1"),
+    new LoggedTunableNumber("Elevator/kS/Stage2"),
+    new LoggedTunableNumber("Elevator/kS/Stage3")
+  };
+  private static final LoggedTunableNumber[] kG = {
+    new LoggedTunableNumber("Elevator/kG/Stage1"),
+    new LoggedTunableNumber("Elevator/kG/Stage2"),
+    new LoggedTunableNumber("Elevator/kG/Stage3")
+  };
+  private static final LoggedTunableNumber[] kA = {
+    new LoggedTunableNumber("Elevator/kA/Stage1"),
+    new LoggedTunableNumber("Elevator/kA/Stage2"),
+    new LoggedTunableNumber("Elevator/kA/Stage3")
+  };
   private static final LoggedTunableNumber maxVelocityMetersPerSec =
       new LoggedTunableNumber("Elevator/MaxVelocityMetersPerSec", 2.0);
   private static final LoggedTunableNumber maxAccelerationMetersPerSec2 =
@@ -59,16 +71,20 @@ public class Elevator {
       case COMPBOT, DEVBOT -> {
         kP.initDefault(1200);
         kD.initDefault(30);
-        kS.initDefault(0);
-        kG.initDefault(5);
-        kA.initDefault(0);
+        for (int stage = 0; stage < 3; stage++) {
+          kS[stage].initDefault(0);
+          kG[stage].initDefault(5);
+          kA[stage].initDefault(0);
+        }
       }
       case SIMBOT -> {
         kP.initDefault(5000);
         kD.initDefault(2000);
-        kS.initDefault(5);
-        kG.initDefault(50);
-        kA.initDefault(0);
+        for (int stage = 0; stage < 3; stage++) {
+          kS[stage].initDefault(5);
+          kG[stage].initDefault(50);
+          kA[stage].initDefault(0);
+        }
       }
     }
   }
@@ -166,9 +182,10 @@ public class Elevator {
       double accel = (setpoint.velocity - previousVelocity) / Constants.loopPeriodSecs;
       io.runPosition(
           setpoint.position / drumRadius + homedPosition,
-          kS.get() * Math.signum(setpoint.velocity) // Magnitude irrelevant
-              + kG.get()
-              + kA.get() * accel);
+          kS[getStage()].get() * Math.signum(setpoint.velocity) // Magnitude irrelevant
+              + kG[getStage()].get()
+              + kA[getStage()].get() * accel);
+
       // Check at goal
       atGoal =
           EqualsUtil.epsilonEquals(setpoint.position, goalState.position)
@@ -279,6 +296,17 @@ public class Elevator {
   @AutoLogOutput(key = "Elevator/MeasuredHeightMeters")
   public double getPositionMeters() {
     return (inputs.positionRad - homedPosition) * drumRadius;
+  }
+
+  @AutoLogOutput(key = "Elevator/MeasuredStage")
+  public int getStage() {
+    if (getPositionMeters() <= SuperstructureConstants.stage1ToStage2Height) {
+      return 0;
+    } else if (getPositionMeters() <= SuperstructureConstants.stage2ToStage3Height) {
+      return 1;
+    } else {
+      return 2;
+    }
   }
 
   public double getGoalMeters() {

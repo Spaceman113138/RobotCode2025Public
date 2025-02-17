@@ -78,6 +78,7 @@ public class FieldConstants {
         new Pose2d[6]; // Starting facing the driver station in clockwise order
     public static final List<Map<ReefLevel, Pose3d>> branchPositions =
         new ArrayList<>(); // Starting at the right branch facing the driver station in clockwise
+    public static final List<Map<ReefLevel, Pose2d>> branchPositions2d = new ArrayList<>();
 
     static {
       // Initialize faces
@@ -93,13 +94,14 @@ public class FieldConstants {
       for (int face = 0; face < 6; face++) {
         Map<ReefLevel, Pose3d> fillRight = new HashMap<>();
         Map<ReefLevel, Pose3d> fillLeft = new HashMap<>();
+        Map<ReefLevel, Pose2d> fillRight2d = new HashMap<>();
+        Map<ReefLevel, Pose2d> fillLeft2d = new HashMap<>();
         for (var level : ReefLevel.values()) {
           Pose2d poseDirection = new Pose2d(center, Rotation2d.fromDegrees(180 - (60 * face)));
           double adjustX = Units.inchesToMeters(30.738);
           double adjustY = Units.inchesToMeters(6.469);
 
-          fillRight.put(
-              level,
+          var rightBranchPose =
               new Pose3d(
                   new Translation3d(
                       poseDirection
@@ -112,9 +114,8 @@ public class FieldConstants {
                   new Rotation3d(
                       0,
                       Units.degreesToRadians(level.pitch),
-                      poseDirection.getRotation().getRadians())));
-          fillLeft.put(
-              level,
+                      poseDirection.getRotation().getRadians()));
+          var leftBranchPose =
               new Pose3d(
                   new Translation3d(
                       poseDirection
@@ -127,10 +128,17 @@ public class FieldConstants {
                   new Rotation3d(
                       0,
                       Units.degreesToRadians(level.pitch),
-                      poseDirection.getRotation().getRadians())));
+                      poseDirection.getRotation().getRadians()));
+
+          fillRight.put(level, rightBranchPose);
+          fillLeft.put(level, leftBranchPose);
+          fillRight2d.put(level, rightBranchPose.toPose2d());
+          fillLeft2d.put(level, leftBranchPose.toPose2d());
         }
         branchPositions.add(fillRight);
         branchPositions.add(fillLeft);
+        branchPositions2d.add(fillRight2d);
+        branchPositions2d.add(fillLeft2d);
       }
     }
   }
@@ -177,7 +185,8 @@ public class FieldConstants {
     OFFICIAL("2025-official"),
     NO_BARGE("2025-no-barge"),
     BLUE_REEF("2025-blue-reef"),
-    RED_REEF("2025-red-reef");
+    RED_REEF("2025-red-reef"),
+    FIELD_BORDER("2025-field-border");
 
     AprilTagLayoutType(String name) {
       if (Constants.disableHAL) {

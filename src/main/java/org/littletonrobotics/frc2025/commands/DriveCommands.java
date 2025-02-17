@@ -26,6 +26,7 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import org.littletonrobotics.frc2025.RobotState;
@@ -69,7 +70,7 @@ public class DriveCommands {
       DoubleSupplier xSupplier,
       DoubleSupplier ySupplier,
       DoubleSupplier omegaSupplier,
-      Boolean robotRelative) {
+      BooleanSupplier robotRelative) {
     return Commands.run(
         () -> {
           // Get linear velocity
@@ -89,7 +90,7 @@ public class DriveCommands {
                   omega * drive.getMaxAngularSpeedRadPerSec());
 
           drive.runVelocity(
-              robotRelative
+              robotRelative.getAsBoolean()
                   ? speeds
                   : ChassisSpeeds.fromFieldRelativeSpeeds(
                       speeds,

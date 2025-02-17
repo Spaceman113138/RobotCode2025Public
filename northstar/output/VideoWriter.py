@@ -99,8 +99,12 @@ class FFmpegVideoWriter(VideoWriter):
 
     def _frame_thread(self, q_in: queue.Queue[cv2.Mat]) -> None:
         while self._running:
-            frame, image_observations, obj_detect_observations = q_in.get()
-            frame = frame.copy()
-            [overlay_image_observation(frame, x) for x in image_observations]
-            [overlay_obj_detect_observation(frame, x) for x in obj_detect_observations]
-            self._ffmpeg.stdin.write(frame.tobytes())
+            try:
+                frame, image_observations, obj_detect_observations = q_in.get(timeout=0.1)
+            except:
+                pass
+            else:
+                frame = frame.copy()
+                [overlay_image_observation(frame, x) for x in image_observations]
+                [overlay_obj_detect_observation(frame, x) for x in obj_detect_observations]
+                self._ffmpeg.stdin.write(frame.tobytes())

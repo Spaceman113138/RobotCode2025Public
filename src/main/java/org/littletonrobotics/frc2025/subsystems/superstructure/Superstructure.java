@@ -556,6 +556,17 @@ public class Superstructure extends SubsystemBase {
     }
   }
 
+  public Command runHomingSequence() {
+    return runOnce(
+        () -> {
+          state = SuperstructureState.START;
+          next = null;
+          if (edgeCommand != null) {
+            edgeCommand.command.cancel();
+          }
+        });
+  }
+
   private Command addSlamAvoidance(
       Command command, SuperstructureState from, SuperstructureState to) {
     return Commands.sequence(
