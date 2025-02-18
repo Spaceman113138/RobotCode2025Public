@@ -150,14 +150,13 @@ public class ModuleIOComp implements ModuleIO {
 
     // Configure periodic frames
     BaseStatusSignal.setUpdateFrequencyForAll(
-        DriveConstants.odometryFrequency, drivePosition, turnPosition);
+        DriveConstants.odometryFrequency, drivePosition, turnPosition, turnAbsolutePosition);
     BaseStatusSignal.setUpdateFrequencyForAll(
         50.0,
         driveVelocity,
         driveAppliedVolts,
         driveSupplyCurrentAmps,
         driveTorqueCurrentAmps,
-        turnAbsolutePosition,
         turnVelocity,
         turnAppliedVolts,
         turnSupplyCurrentAmps,

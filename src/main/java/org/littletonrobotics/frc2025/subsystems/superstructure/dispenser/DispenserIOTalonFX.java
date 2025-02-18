@@ -45,7 +45,7 @@ public class DispenserIOTalonFX implements DispenserIO {
   private final StatusSignal<Angle> internalPosition;
   private final StatusSignal<Angle> encoderAbsolutePosition;
   private final StatusSignal<Angle> encoderRelativePosition;
-  private final StatusSignal<AngularVelocity> Velocity;
+  private final StatusSignal<AngularVelocity> internalVelocity;
   private final StatusSignal<Voltage> appliedVolts;
   private final StatusSignal<Current> supplyCurrentAmps;
   private final StatusSignal<Current> torqueCurrentAmps;
@@ -90,7 +90,7 @@ public class DispenserIOTalonFX implements DispenserIO {
     internalPosition = talon.getPosition();
     encoderAbsolutePosition = encoder.getAbsolutePosition();
     encoderRelativePosition = encoder.getPosition();
-    Velocity = talon.getVelocity();
+    internalVelocity = talon.getVelocity();
     appliedVolts = talon.getMotorVoltage();
     supplyCurrentAmps = talon.getSupplyCurrent();
     torqueCurrentAmps = talon.getTorqueCurrent();
@@ -99,13 +99,13 @@ public class DispenserIOTalonFX implements DispenserIO {
     BaseStatusSignal.setUpdateFrequencyForAll(
         50.0,
         internalPosition,
-        encoderAbsolutePosition,
-        encoderRelativePosition,
-        Velocity,
+        internalVelocity,
         appliedVolts,
         supplyCurrentAmps,
         torqueCurrentAmps,
         temp);
+    BaseStatusSignal.setUpdateFrequencyForAll(
+        250, encoderAbsolutePosition, encoderRelativePosition);
     ParentDevice.optimizeBusUtilizationForAll(talon, encoder);
   }
 
@@ -115,7 +115,7 @@ public class DispenserIOTalonFX implements DispenserIO {
     boolean motorConnected =
         BaseStatusSignal.refreshAll(
                 internalPosition,
-                Velocity,
+                internalVelocity,
                 appliedVolts,
                 supplyCurrentAmps,
                 torqueCurrentAmps,
@@ -126,13 +126,12 @@ public class DispenserIOTalonFX implements DispenserIO {
 
     inputs.motorConnected = motorConnectedDebouncer.calculate(motorConnected);
     inputs.encoderConnected = encoderConnectedDebouncer.calculate(encoderConnected);
-    // Pivot inputs
     inputs.internalPosition = Rotation2d.fromRotations(internalPosition.getValueAsDouble());
     inputs.encoderAbsolutePosition =
         Rotation2d.fromRotations(encoderAbsolutePosition.getValueAsDouble()).minus(offset);
     inputs.encoderRelativePosition =
         encoderRelativePosition.getValue().in(Radians) - offset.getRadians();
-    inputs.velocityRadPerSec = Velocity.getValue().in(RadiansPerSecond);
+    inputs.velocityRadPerSec = internalVelocity.getValue().in(RadiansPerSecond);
     inputs.appliedVolts = appliedVolts.getValue().in(Volts);
     inputs.supplyCurrentAmps = supplyCurrentAmps.getValue().in(Amps);
     inputs.torqueCurrentAmps = torqueCurrentAmps.getValue().in(Amps);

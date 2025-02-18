@@ -226,10 +226,12 @@ public class DriveToPose extends Command {
     Logger.recordOutput("DriveToPose/ThetaSetpoint", thetaController.getSetpoint().position);
     Logger.recordOutput(
         "DriveToPose/Setpoint",
-        new Pose2d(
-            lastSetpointTranslation,
-            Rotation2d.fromRadians(thetaController.getSetpoint().position)));
-    Logger.recordOutput("DriveToPose/Goal", targetPose);
+        new Pose2d[] {
+          new Pose2d(
+              lastSetpointTranslation,
+              Rotation2d.fromRadians(thetaController.getSetpoint().position))
+        });
+    Logger.recordOutput("DriveToPose/Goal", new Pose2d[] {targetPose});
   }
 
   @Override

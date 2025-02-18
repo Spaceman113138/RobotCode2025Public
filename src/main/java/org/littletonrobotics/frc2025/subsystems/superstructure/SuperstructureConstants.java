@@ -14,27 +14,25 @@ import edu.wpi.first.math.util.Units;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public class SuperstructureConstants {
-  public static final double pivotToTunnelFront = 0.16;
-  public static final double pivotToTunnelBack = 0.05;
-  public static final double pivotToGripper = Units.inchesToMeters(5.25);
+  public static final double pivotToTunnelFront = 0.177800;
+  public static final double pivotToTunnelBack = 0.076200;
   public static final double G = 9.807;
   // From inside face to inside face, measured from CAD
   public static final double stageHeight = Units.inchesToMeters(29.00);
-  public static final double stageToStageOffset = Units.inchesToMeters(0.0);
   public static final double stageThickness = Units.inchesToMeters(1.0);
-  public static final double dispenserToCarriage = Units.inchesToMeters(4.268464);
-  public static final double bottomToDispenser = Units.inchesToMeters(4.078940);
-  public static final double stageToStage = Units.inchesToMeters(5.25);
+  public static final double dispenserToTop = 0.125757;
+  public static final double bottomToDispenser = 0.164326;
+  public static final double stageToStage = Units.inchesToMeters(5.0);
 
   // 2d position of both superstructure and dispenser origin on robot (x forward from center, y off
   // the ground)
   public static final Rotation2d elevatorAngle = Rotation2d.fromDegrees(82.0);
-  public static final Translation2d superstructureOrigin2d = new Translation2d(0.10686, 0.06357);
+  public static final Translation2d superstructureOrigin2d = new Translation2d(0.0825, 0.029);
   public static final Translation3d superstructureOrigin3d =
       new Translation3d(superstructureOrigin2d.getX(), 0.0, superstructureOrigin2d.getY());
   public static final Translation2d dispenserOrigin2d =
       superstructureOrigin2d.plus(
-          new Translation2d(bottomToDispenser + stageThickness * 3, elevatorAngle));
+          new Translation2d(bottomToDispenser + stageThickness * 2, elevatorAngle));
   public static final Translation3d dispenserOrigin3d =
       new Translation3d(dispenserOrigin2d.getX(), 0.0, dispenserOrigin2d.getY());
 
@@ -44,14 +42,14 @@ public class SuperstructureConstants {
   public static final double elevatorMaxTravel =
       stageHeight
           + 2 * (stageHeight - stageToStage)
-          + 4 * (stageThickness + stageToStageOffset)
-          - dispenserToCarriage
+          + 4 * (stageThickness)
+          - dispenserToTop
           - bottomToDispenser;
 
   public static final double algaeMinPassThroughHeight =
       stageHeight
           - bottomToDispenser
-          - dispenserToCarriage
+          - dispenserToTop
           + stageHeight
           - (stageToStage - stageThickness);
 

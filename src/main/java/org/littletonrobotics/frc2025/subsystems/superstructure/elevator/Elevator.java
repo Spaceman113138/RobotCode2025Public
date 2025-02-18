@@ -93,7 +93,9 @@ public class Elevator {
   private final ElevatorIOInputsAutoLogged inputs = new ElevatorIOInputsAutoLogged();
 
   private final Alert motorDisconnectedAlert =
-      new Alert("Elevator motor disconnected!", Alert.AlertType.kWarning);
+      new Alert("Elevator leader motor disconnected!", Alert.AlertType.kWarning);
+  private final Alert followerDisconnectedAlert =
+      new Alert("Elevator follower motor disconnected!", Alert.AlertType.kWarning);
   private BooleanSupplier coastOverride = () -> false;
   private BooleanSupplier disabledOverride = () -> false;
 
@@ -135,6 +137,7 @@ public class Elevator {
     Logger.processInputs("Elevator", inputs);
 
     motorDisconnectedAlert.set(!inputs.motorConnected);
+    followerDisconnectedAlert.set(!inputs.followerConnected);
 
     // Update tunable numbers
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {

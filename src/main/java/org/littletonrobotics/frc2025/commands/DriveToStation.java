@@ -30,8 +30,16 @@ public class DriveToStation extends DriveToPose {
           "DriveToStation/HorizontalMaxOffset",
           FieldConstants.CoralStation.stationLength / 2 - Units.inchesToMeters(16));
 
+  public DriveToStation(Drive drive, boolean sideIntaking) {
+    this(drive, () -> 0, () -> 0, () -> 0, sideIntaking);
+  }
+
   public DriveToStation(
-      Drive drive, DoubleSupplier linearX, DoubleSupplier linearY, DoubleSupplier theta) {
+      Drive drive,
+      DoubleSupplier linearX,
+      DoubleSupplier linearY,
+      DoubleSupplier theta,
+      boolean sideIntaking) {
     super(
         drive,
         () -> {
@@ -52,7 +60,7 @@ public class DriveToStation extends DriveToPose {
                     new Rotation2d());
 
             Rotation2d rotationOffset = curPose.getRotation().minus(stationCenter.getRotation());
-            if (Math.abs(rotationOffset.getDegrees()) > 45) {
+            if (Math.abs(rotationOffset.getDegrees()) > 45 && sideIntaking) {
               finalPoses.add(
                   new Pose2d(
                       stationCenter.transformBy(offset).getTranslation(),

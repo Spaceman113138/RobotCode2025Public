@@ -133,7 +133,9 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
               Rotation2d.fromDegrees(-reefAlgaeIntakeAngle))
           .transformBy(
               GeomUtil.toTransform2d(
-                  FieldConstants.algaeDiameter / 2.0 + pivotToGripper + Units.inchesToMeters(3.0),
+                  FieldConstants.algaeDiameter / 2.0
+                      + pivotToTunnelFront
+                      + Units.inchesToMeters(3.0),
                   0.0))
           .getTranslation();
     }
@@ -154,9 +156,7 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
     THROW(() -> elevatorMaxTravel, () -> 40.0),
     PRE_PROCESSOR("Processing", 0.2, -10.0),
     ALGAE_STOW(
-        "AlgaeStow",
-        stageHeight - dispenserToCarriage - bottomToDispenser,
-        pivotSafeAngle.getDegrees()),
+        "AlgaeStow", stageHeight - dispenserToTop - bottomToDispenser, pivotSafeAngle.getDegrees()),
     L1_CORAL_REVERSED(ReefLevel.L1, true),
     L2_CORAL_REVERSED(ReefLevel.L2, true),
     L3_CORAL_REVERSED(ReefLevel.L3, true),

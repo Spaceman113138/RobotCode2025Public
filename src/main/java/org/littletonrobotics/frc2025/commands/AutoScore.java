@@ -31,6 +31,7 @@ import org.littletonrobotics.frc2025.FieldConstants.ReefLevel;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
 import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
+import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructurePose.DispenserPose;
@@ -131,7 +132,11 @@ public class AutoScore extends SequentialCommandGroup {
 
     return Commands.runOnce(
             () -> {
-              // Reset State
+              // Start LEDs
+              Leds.getInstance().autoScoring = true;
+              Leds.getInstance().autoScoringLevel = reefLevel.get();
+
+              // Reset state
               needsToGetBack.value = false;
               hasEnded.value = false;
 
@@ -184,9 +189,29 @@ public class AutoScore extends SequentialCommandGroup {
               Logger.recordOutput("AutoScore/AllowPreReady", false);
               Logger.recordOutput("AutoScore/AllowEject", false);
 
+              // Stop LEDs
+              Leds.getInstance().autoScoring = false;
+
               // Indicate has ended command
               hasEnded.value = true;
             });
+  }
+
+  public static Command getAutoScoreCommand(
+      Drive drive,
+      Superstructure superstructure,
+      Function<Supplier<CoralObjective>, Command> requestCoralScoredCommand,
+      Supplier<ReefLevel> reefLevel,
+      Supplier<Optional<CoralObjective>> coralObjective) {
+    return getAutoScoreCommand(
+        drive,
+        superstructure,
+        requestCoralScoredCommand,
+        reefLevel,
+        coralObjective,
+        () -> 0,
+        () -> 0,
+        () -> 0);
   }
 
   public static Command getReefIntakeCommand(
@@ -226,7 +251,6 @@ public class AutoScore extends SequentialCommandGroup {
         .onTrue(
             getSuperstructureGetBackCommand(superstructure, algaeIntakeState)
                 .andThen(() -> needsToGetBack.value = false));
-
     return Commands.runOnce(
             () -> {
               // Reset State

@@ -34,11 +34,13 @@ public class Leds extends VirtualSubsystem {
   public int loopCycleCount = 0;
   public boolean hpAttentionAlert = false;
   public boolean endgameAlert = false;
+  public boolean autoScoring = false;
   public boolean superstructureCoast = false;
   public boolean superstructureEstopped = false;
   public boolean lowBatteryAlert = false;
   public Optional<ReefLevel> firstPriorityLevel = Optional.empty();
   public Optional<ReefLevel> secondPriorityLevel = Optional.empty();
+  public ReefLevel autoScoringLevel = ReefLevel.L4;
   public boolean firstPriorityBlocked = false;
   public boolean secondPriorityBlocked = false;
   public String hexColor = "";
@@ -63,9 +65,13 @@ public class Leds extends VirtualSubsystem {
   private static final Section fullSection = new Section(0, length);
   private static final Section topSection = new Section(length / 2, length);
   private static final Section bottomSection = new Section(0, length / 2);
+  private static final Section topThreeQuartSection = new Section(length / 4, length);
+  private static final Section bottomQuartSection = new Section(0, length / 4);
   private static final double strobeDuration = 0.1;
   private static final double breathFastDuration = 0.5;
   private static final double breathSlowDuration = 1.0;
+  private static final double rainbowCycleLength = 25.0;
+  private static final double rainbowDuration = 0.25;
   private static final double waveExponent = 0.4;
   private static final double waveFastCycleLength = 25.0;
   private static final double waveFastDuration = 0.25;
@@ -114,7 +120,7 @@ public class Leds extends VirtualSubsystem {
     // Update auto state
     if (DriverStation.isEnabled()) {
       lastEnabledAuto = DriverStation.isAutonomous();
-      lastEnabledTime = Timer.getFPGATimestamp();
+      lastEnabledTime = Timer.getTimestamp();
     }
 
     // Update estop state
@@ -139,13 +145,12 @@ public class Leds extends VirtualSubsystem {
       if (superstructureCoast) {
         // Elevator coast alert
         solid(fullSection, Color.kWhite);
-      } else if (lastEnabledAuto && Timer.getFPGATimestamp() - lastEnabledTime < autoFadeMaxTime) {
+      } else if (lastEnabledAuto && Timer.getTimestamp() - lastEnabledTime < autoFadeMaxTime) {
         // Auto fade
         wave(
             new Section(
                 0,
-                (int)
-                    (length * (1 - ((Timer.getFPGATimestamp() - lastEnabledTime) / autoFadeTime)))),
+                (int) (length * (1 - ((Timer.getTimestamp() - lastEnabledTime) / autoFadeTime)))),
             Color.kGold,
             Color.kDarkBlue,
             waveFastCycleLength,
@@ -216,6 +221,19 @@ public class Leds extends VirtualSubsystem {
               .accept(secondPriorityLevel, secondPriorityBlocked, bottomSection)
               .toHexString();
 
+      // Auto scoring
+      if (autoScoring) {
+        rainbow(topThreeQuartSection, rainbowCycleLength, rainbowDuration);
+        solid(
+            bottomQuartSection,
+            switch (autoScoringLevel) {
+              case L1 -> l1PriorityColor;
+              case L2 -> l2PriorityColor;
+              case L3 -> l3PriorityColor;
+              case L4 -> l4PriorityColor;
+            });
+      }
+
       // Human player alert
       if (hpAttentionAlert) {
         strobe(fullSection, Color.kWhite, Color.kBlack, strobeDuration);
@@ -250,7 +268,7 @@ public class Leds extends VirtualSubsystem {
   }
 
   private Color strobe(Section section, Color c1, Color c2, double duration) {
-    boolean c1On = ((Timer.getFPGATimestamp() % duration) / duration) > 0.5;
+    boolean c1On = ((Timer.getTimestamp() % duration) / duration) > 0.5;
     return solid(section, c1On ? c1 : c2);
   }
 
@@ -269,8 +287,18 @@ public class Leds extends VirtualSubsystem {
     return breath(section, c1, c2, duration, Timer.getTimestamp());
   }
 
+  private void rainbow(Section section, double cycleLength, double duration) {
+    double x = (1 - ((Timer.getTimestamp() / duration) % 1.0)) * 180.0;
+    double xDiffPerLed = 180.0 / cycleLength;
+    for (int i = section.end() - 1; i >= section.start(); i--) {
+      x += xDiffPerLed;
+      x %= 180.0;
+      buffer.setHSV(i, (int) x, 255, 255);
+    }
+  }
+
   private void wave(Section section, Color c1, Color c2, double cycleLength, double duration) {
-    double x = (1 - ((Timer.getFPGATimestamp() % duration) / duration)) * 2.0 * Math.PI;
+    double x = (1 - ((Timer.getTimestamp() % duration) / duration)) * 2.0 * Math.PI;
     double xDiffPerLed = (2.0 * Math.PI) / cycleLength;
     for (int i = section.end() - 1; i >= section.start(); i--) {
       x += xDiffPerLed;
@@ -289,8 +317,7 @@ public class Leds extends VirtualSubsystem {
   }
 
   private void stripes(Section section, List<Color> colors, int stripeLength, double duration) {
-    int offset =
-        (int) (Timer.getFPGATimestamp() % duration / duration * stripeLength * colors.size());
+    int offset = (int) (Timer.getTimestamp() % duration / duration * stripeLength * colors.size());
     for (int i = section.end() - 1; i >= section.start(); i--) {
       int colorIndex =
           (int) (Math.floor((double) (i - offset) / stripeLength) + colors.size()) % colors.size();

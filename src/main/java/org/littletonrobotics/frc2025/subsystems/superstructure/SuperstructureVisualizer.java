@@ -15,7 +15,6 @@ import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.util.Color8Bit;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
-import org.littletonrobotics.frc2025.subsystems.superstructure.slam.Slam;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.mechanism.LoggedMechanism2d;
@@ -23,9 +22,10 @@ import org.littletonrobotics.junction.mechanism.LoggedMechanismLigament2d;
 import org.littletonrobotics.junction.mechanism.LoggedMechanismRoot2d;
 
 public class SuperstructureVisualizer {
-  private static final Translation3d intakeOrigin3d = new Translation3d(0.2850, 0.0, 0.1630);
-  private static final Rotation2d ambiguousIntakePosition =
-      Slam.minAngle.interpolate(Slam.maxAngle, 0.5);
+  private static final double modelToRealDispenserRotation = 5.0;
+  private static final Translation3d intakeOrigin3d = new Translation3d(0.341630, 0.0, 0.287234);
+  private static final double intakeMaxExtension = 0.442630;
+  private static final double intakeAngleDeg = 14.010320;
 
   private final String name;
   private final LoggedMechanism2d mechanism =
@@ -71,15 +71,12 @@ public class SuperstructureVisualizer {
     Logger.recordOutput("Mechanism2d/" + name, mechanism);
 
     // Max of top of carriage or starting height
-    final double heightFromBottom = elevatorHeightMeters + bottomToDispenser + stageThickness * 2.0;
+    final double heightFromBottom =
+        elevatorHeightMeters + bottomToDispenser + dispenserToTop + stageThickness * 2.0;
     final double firstStageHeight =
-        Math.max(
-            heightFromBottom - stageHeight + bottomToDispenser - (stageThickness / 2.0),
-            stageThickness * (3.0 / 2.0));
+        Math.max(heightFromBottom - stageHeight - stageThickness, stageThickness);
     final double secondStageHeight =
-        Math.max(
-            firstStageHeight - stageHeight + stageToStage - (stageThickness / 2.0),
-            stageThickness * (1.0 / 2.0) + stageToStageOffset);
+        Math.max(firstStageHeight - stageHeight + stageToStage - stageThickness, 0.0);
 
     Pose3d pivotPose3d =
         new Pose3d(
@@ -89,7 +86,8 @@ public class SuperstructureVisualizer {
             new Rotation3d(
                 0.0,
                 // Have to invert angle due to CAD??
-                -pivotFinalAngle.getRadians(),
+                -(pivotFinalAngle.getRadians()
+                    + Units.degreesToRadians(modelToRealDispenserRotation)),
                 0.0));
 
     Logger.recordOutput(
@@ -104,21 +102,16 @@ public class SuperstructureVisualizer {
                 new Translation3d(
                     firstStageHeight, new Rotation3d(0.0, -elevatorAngle.getRadians(), 0.0))),
             new Rotation3d()),
+        new Pose3d(pivotPose3d.getTranslation(), new Rotation3d()),
         pivotPose3d);
     Logger.recordOutput(
         "Mechanism3d/" + name + "/AlgaeIntake",
         new Pose3d(
-            intakeOrigin3d,
-            new Rotation3d(
-                0.0,
-                Rotation2d.kPi
-                        .minus(
-                            (slammed
-                                ? (retracting ? Slam.maxAngle : Slam.minAngle)
-                                : ambiguousIntakePosition))
-                        .getRadians()
-                    - Math.PI / 2.0,
-                0.0)));
+            intakeOrigin3d.plus(
+                new Translation3d(
+                    slammed ? (retracting ? 0.0 : intakeMaxExtension) : intakeMaxExtension / 2.0,
+                    new Rotation3d(0.0, Units.degreesToRadians(-intakeAngleDeg), 0.0))),
+            new Rotation3d()));
     if (hasAlgae) {
       Logger.recordOutput(
           "Mechanism3d/" + name + "/Algae",
@@ -126,7 +119,7 @@ public class SuperstructureVisualizer {
               .transformBy(new Transform3d(Pose3d.kZero, pivotPose3d))
               .transformBy(
                   new Transform3d(
-                      pivotToGripper + FieldConstants.algaeDiameter / 2.0,
+                      pivotToTunnelFront + FieldConstants.algaeDiameter / 2.0,
                       0.0,
                       0.0,
                       Rotation3d.kZero))

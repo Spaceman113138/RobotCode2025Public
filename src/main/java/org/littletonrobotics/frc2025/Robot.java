@@ -186,10 +186,10 @@ public class Robot extends LoggedRobot {
       if (!autonomousCommand.isScheduled() && !autoMessagePrinted) {
         if (DriverStation.isAutonomousEnabled()) {
           System.out.printf(
-              "*** Auto finished in %.2f secs ***%n", Timer.getFPGATimestamp() - autoStart);
+              "*** Auto finished in %.2f secs ***%n", Timer.getTimestamp() - autoStart);
         } else {
           System.out.printf(
-              "*** Auto cancelled in %.2f secs ***%n", Timer.getFPGATimestamp() - autoStart);
+              "*** Auto cancelled in %.2f secs ***%n", Timer.getTimestamp() - autoStart);
         }
         autoMessagePrinted = true;
       }
@@ -242,7 +242,7 @@ public class Robot extends LoggedRobot {
     }
 
     // GC alert
-    gcAlert.set(Timer.getFPGATimestamp() < 45.0);
+    gcAlert.set(Timer.getTimestamp() < 45.0);
 
     // Log robot state values
     RobotState.getInstance().periodicLog();
@@ -259,7 +259,7 @@ public class Robot extends LoggedRobot {
   /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
-    autoStart = Timer.getFPGATimestamp();
+    autoStart = Timer.getTimestamp();
     autonomousCommand = robotContainer.getAutonomousCommand();
 
     if (autonomousCommand != null) {
