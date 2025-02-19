@@ -169,7 +169,7 @@ public class Robot extends LoggedRobot {
     robotContainer = new RobotContainer();
 
     // Switch thread to high priority to improve loop timing
-    Threads.setCurrentThreadPriority(true, 99);
+    Threads.setCurrentThreadPriority(true, 5);
   }
 
   /** This function is called periodically during all modes. */
