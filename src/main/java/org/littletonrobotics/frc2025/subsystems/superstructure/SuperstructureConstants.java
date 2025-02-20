@@ -18,11 +18,12 @@ public class SuperstructureConstants {
   public static final double pivotToTunnelBack = 0.076200;
   public static final double G = 9.807;
   // From inside face to inside face, measured from CAD
+  public static final double firstStageHeight = Units.inchesToMeters(33.0);
   public static final double stageHeight = Units.inchesToMeters(29.00);
   public static final double stageThickness = Units.inchesToMeters(1.0);
-  public static final double dispenserToTop = 0.125757;
+  public static final double dispenserToTop = Units.inchesToMeters(5.524938);
   public static final double bottomToDispenser = 0.164326;
-  public static final double stageToStage = Units.inchesToMeters(5.0);
+  public static final double stageToStage = Units.inchesToMeters(4.144181);
 
   // 2d position of both superstructure and dispenser origin on robot (x forward from center, y off
   // the ground)
@@ -40,7 +41,7 @@ public class SuperstructureConstants {
   // minus the difference from superstructure origin to dispenser origin and from the topped out
   // position to the dispenser
   public static final double elevatorMaxTravel =
-      stageHeight
+      firstStageHeight
           + 2 * (stageHeight - stageToStage)
           + 4 * (stageThickness)
           - dispenserToTop
@@ -61,4 +62,6 @@ public class SuperstructureConstants {
       new LoggedTunableNumber("Superstructure/Throw/Height", elevatorMaxTravel);
   public static final LoggedTunableNumber throwVelocity =
       new LoggedTunableNumber("Superstructure/Throw/Velocity", 3.0);
+
+  public static final double chariotMaxExtension = 0.442630;
 }

@@ -24,7 +24,6 @@ import org.littletonrobotics.junction.mechanism.LoggedMechanismRoot2d;
 public class SuperstructureVisualizer {
   private static final double modelToRealDispenserRotation = 5.0;
   private static final Translation3d intakeOrigin3d = new Translation3d(0.341630, 0.0, 0.287234);
-  private static final double intakeMaxExtension = 0.442630;
   private static final double intakeAngleDeg = 14.010320;
 
   private final String name;
@@ -60,8 +59,7 @@ public class SuperstructureVisualizer {
   public void update(
       double elevatorHeightMeters,
       Rotation2d pivotFinalAngle,
-      boolean slammed,
-      boolean retracting,
+      double algaeIntakePosition,
       boolean hasAlgae) {
     elevatorMechanism.setLength(
         EqualsUtil.epsilonEquals(elevatorHeightMeters, 0.0)
@@ -74,7 +72,9 @@ public class SuperstructureVisualizer {
     final double heightFromBottom =
         elevatorHeightMeters + bottomToDispenser + dispenserToTop + stageThickness * 2.0;
     final double firstStageHeight =
-        Math.max(heightFromBottom - stageHeight - stageThickness, stageThickness);
+        Math.max(
+            heightFromBottom - SuperstructureConstants.firstStageHeight - stageThickness,
+            stageThickness);
     final double secondStageHeight =
         Math.max(firstStageHeight - stageHeight + stageToStage - stageThickness, 0.0);
 
@@ -91,7 +91,7 @@ public class SuperstructureVisualizer {
                 0.0));
 
     Logger.recordOutput(
-        "Mechanism3d/" + name + "/Elevator",
+        "Mechanism3d/" + name + "/Superstructure",
         new Pose3d(
             superstructureOrigin3d.plus(
                 new Translation3d(
@@ -103,13 +103,11 @@ public class SuperstructureVisualizer {
                     firstStageHeight, new Rotation3d(0.0, -elevatorAngle.getRadians(), 0.0))),
             new Rotation3d()),
         new Pose3d(pivotPose3d.getTranslation(), new Rotation3d()),
-        pivotPose3d);
-    Logger.recordOutput(
-        "Mechanism3d/" + name + "/AlgaeIntake",
+        pivotPose3d,
         new Pose3d(
             intakeOrigin3d.plus(
                 new Translation3d(
-                    slammed ? (retracting ? 0.0 : intakeMaxExtension) : intakeMaxExtension / 2.0,
+                    algaeIntakePosition,
                     new Rotation3d(0.0, Units.degreesToRadians(-intakeAngleDeg), 0.0))),
             new Rotation3d()));
     if (hasAlgae) {

@@ -40,12 +40,15 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSpark;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
+import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot;
+import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIO;
+import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIOSim;
+import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.*;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIO;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOSim;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIOTalonFX;
-import org.littletonrobotics.frc2025.subsystems.superstructure.slam.*;
 import org.littletonrobotics.frc2025.subsystems.vision.Vision;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
@@ -97,7 +100,7 @@ public class RobotContainer {
   public RobotContainer() {
     Elevator elevator = null;
     Dispenser dispenser = null;
-    Slam slam = null;
+    Chariot chariot = null;
 
     if (Constants.getMode() != Constants.Mode.REPLAY) {
       switch (Constants.getRobot()) {
@@ -122,9 +125,9 @@ public class RobotContainer {
                   new DispenserIOTalonFX(),
                   new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
                   new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
-          slam =
-              new Slam(
-                  new SlamIOTalonFX(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
+          chariot =
+              new Chariot(
+                  new ChariotIOTalonFX(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
         }
         case DEVBOT -> {
           drive =
@@ -143,9 +146,6 @@ public class RobotContainer {
           dispenser =
               new Dispenser(
                   new DispenserIO() {}, new RollerSystemIOSpark(5, true), new RollerSystemIO() {});
-          //   slam =
-          //       new Slam(new SlamIOSpark(), new RollerSystemIOTalonFX(6, "", 40, false, false,
-          // 1.0));
           //   funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(4, false));
         }
         case SIMBOT -> {
@@ -162,9 +162,9 @@ public class RobotContainer {
                   new DispenserIOSim(),
                   new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2),
                   new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2));
-          slam =
-              new Slam(
-                  new SlamIOSim(), new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
+          chariot =
+              new Chariot(
+                  new ChariotIOSim(), new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
         }
       }
     }
@@ -200,8 +200,8 @@ public class RobotContainer {
       dispenser =
           new Dispenser(new DispenserIO() {}, new RollerSystemIO() {}, new RollerSystemIO() {});
     }
-    if (slam == null) {
-      slam = new Slam(new SlamIO() {}, new RollerSystemIO() {});
+    if (chariot == null) {
+      chariot = new Chariot(new ChariotIO() {}, new RollerSystemIO() {});
     }
     if (funnel == null) {
       funnel = new RollerSystem("Funnel", new RollerSystemIO() {});
@@ -211,7 +211,7 @@ public class RobotContainer {
             Constants.getMode() == Mode.REPLAY
                 ? new ReefControlsIO() {}
                 : new ReefControlsIOServer());
-    superstructure = new Superstructure(elevator, dispenser, slam);
+    superstructure = new Superstructure(elevator, dispenser, chariot);
 
     // Set up auto routines
     autoChooser = new LoggedDashboardChooser<>("Auto Choices");
@@ -236,7 +236,7 @@ public class RobotContainer {
     superstructure.setDisabledOverride(superstructureDisable);
     elevator.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
     dispenser.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
-    slam.setCoastOverride(() -> superstructureCoastOverride);
+    chariot.setCoastOverride(() -> superstructureCoastOverride);
 
     // Configure the button bindings
     configureButtonBindings();

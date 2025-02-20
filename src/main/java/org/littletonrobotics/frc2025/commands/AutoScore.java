@@ -15,7 +15,6 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
-import edu.wpi.first.wpilibj2.command.SequentialCommandGroup;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -42,7 +41,7 @@ import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
 
-public class AutoScore extends SequentialCommandGroup {
+public class AutoScore {
   // Radius of regular hexagon is side length
   private static final double reefRadius = Reef.faceLength;
   private static final LoggedTunableNumber maxDistanceReefLineup =
@@ -371,7 +370,7 @@ public class AutoScore extends SequentialCommandGroup {
                     >= FieldConstants.Reef.faceLength
                         + DriveConstants.robotWidth / 2.0
                         + AutoScore.minDistanceReefClear.get())
-        .withInterruptBehavior(InterruptionBehavior.kCancelSelf)
+        .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming)
         .withName("Superstructure Get Back!");
   }
 
@@ -449,10 +448,6 @@ public class AutoScore extends SequentialCommandGroup {
     return withinMaxDistance;
   }
 
-  /**
-   * Get robot pose based on how far away from associated tag we are. Uses 2d estimation data when
-   * close.
-   */
   private static Pose2d getRobotPose(CoralObjective coralObjective, boolean hasAlgae) {
     return RobotState.getInstance()
         .getReefPose(coralObjective.branchId() / 2, getCoralScorePose(coralObjective, hasAlgae));
