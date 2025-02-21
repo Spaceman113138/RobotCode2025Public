@@ -51,8 +51,30 @@ public class AutoScore {
   private static final LoggedTunableNumber maxDistanceSuperstructurePreScore =
       new LoggedTunableNumber(
           "AutoScore/MaxDistanceSuperstructurePreScore", Units.inchesToMeters(36.0));
-  private static final LoggedTunableNumber linearToleranceEject =
-      new LoggedTunableNumber("AutoScore/LinearToleranceEject", 0.05);
+  private static final LoggedTunableNumber[] linearXToleranceEject = {
+    new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L1", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L2", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L3", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L4", 0.05)
+  };
+  private static final LoggedTunableNumber[] linearYToleranceEject = {
+    new LoggedTunableNumber("AutoScore/LinearYToleranceEject/L1", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearYToleranceEject/L2", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearYToleranceEject/L3", 0.05),
+    new LoggedTunableNumber("AutoScore/LinearYToleranceEject/L4", 0.05)
+  };
+  private static final LoggedTunableNumber[] maxLinearVel = {
+    new LoggedTunableNumber("AutoScore/MaxLinearVel/L1", 3),
+    new LoggedTunableNumber("AutoScore/MaxLinearVel/L2", 3),
+    new LoggedTunableNumber("AutoScore/MaxLinearVel/L3", 3),
+    new LoggedTunableNumber("AutoScore/MaxLinearVel/L4", 3)
+  };
+  private static final LoggedTunableNumber[] maxAngularVel = {
+    new LoggedTunableNumber("AutoScore/MaxAngularVel/L1", 3),
+    new LoggedTunableNumber("AutoScore/MaxAngularVel/L2", 3),
+    new LoggedTunableNumber("AutoScore/MaxAngularVel/L3", 3),
+    new LoggedTunableNumber("AutoScore/MaxAngularVel/L4", 3)
+  };
   private static final LoggedTunableNumber thetaToleranceEject =
       new LoggedTunableNumber("AutoScore/ThetaToleranceEject", 2.0);
   private static final LoggedTunableNumber l1AlignOffsetX =
@@ -167,8 +189,20 @@ public class AutoScore {
                   Pose2d poseError =
                       AllianceFlipUtil.apply(robot.get())
                           .relativeTo(goal.apply(coralObjective.get().get()));
+
+                  int intReefLevel = coralObjective.get().get().reefLevel().ordinal();
                   boolean ready =
-                      poseError.getTranslation().getNorm() <= linearToleranceEject.get()
+                      Math.abs(poseError.getTranslation().getX())
+                              <= linearXToleranceEject[intReefLevel].get()
+                          && Math.abs(poseError.getTranslation().getY())
+                              <= linearYToleranceEject[intReefLevel].get()
+                          && Math.hypot(
+                                  RobotState.getInstance().getRobotVelocity().vxMetersPerSecond,
+                                  RobotState.getInstance().getRobotVelocity().vyMetersPerSecond)
+                              <= maxLinearVel[intReefLevel].get()
+                          && Math.abs(
+                                  RobotState.getInstance().getRobotVelocity().omegaRadiansPerSecond)
+                              <= maxAngularVel[intReefLevel].get()
                           && Math.abs(poseError.getRotation().getDegrees())
                               <= thetaToleranceEject.get()
                           && superstructure.atGoal();
