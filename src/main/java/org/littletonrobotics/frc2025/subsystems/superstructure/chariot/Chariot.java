@@ -21,6 +21,7 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOInputsAuto
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator;
+import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator.SlamElevatorGoal;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 

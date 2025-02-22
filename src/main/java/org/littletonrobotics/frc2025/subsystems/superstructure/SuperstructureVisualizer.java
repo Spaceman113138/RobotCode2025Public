@@ -119,7 +119,7 @@ public class SuperstructureVisualizer {
                   new Transform3d(
                       pivotToTunnelFront + FieldConstants.algaeDiameter / 2.0,
                       0.0,
-                      0.0,
+                      -0.08,
                       Rotation3d.kZero))
               .getTranslation());
     } else {

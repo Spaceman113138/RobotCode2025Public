@@ -411,7 +411,6 @@ public class Superstructure extends SubsystemBase {
   }
 
   private Optional<SuperstructureState> bfs(SuperstructureState start, SuperstructureState goal) {
-    System.out.println("bfs: Start " + start.toString() + " to Goal " + goal.toString());
     // Map to track the parent of each visited node
     Map<SuperstructureState, SuperstructureState> parents = new HashMap<>();
     Queue<SuperstructureState> queue = new LinkedList<>();

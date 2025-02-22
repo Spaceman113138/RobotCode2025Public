@@ -15,14 +15,11 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.Optional;
 import java.util.OptionalDouble;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Function;
-import java.util.function.Supplier;
-import org.littletonrobotics.frc2025.FieldConstants;
+import java.util.function.*;
 import org.littletonrobotics.frc2025.FieldConstants.AlgaeObjective;
 import org.littletonrobotics.frc2025.FieldConstants.CoralObjective;
 import org.littletonrobotics.frc2025.FieldConstants.Reef;
@@ -46,11 +43,12 @@ public class AutoScore {
   private static final double reefRadius = Reef.faceLength;
   private static final LoggedTunableNumber maxDistanceReefLineup =
       new LoggedTunableNumber("AutoScore/MaxDistanceReefLineup", 1.5);
+  public static final LoggedTunableNumber minDistanceReefClearAlgae =
+      new LoggedTunableNumber("AutoScore/MinDistanceReefClearAlgae", Units.inchesToMeters(18.0));
   public static final LoggedTunableNumber minDistanceReefClear =
-      new LoggedTunableNumber("AutoScore/MinDistanceReefClear", 0.3);
-  private static final LoggedTunableNumber maxDistanceSuperstructurePreScore =
-      new LoggedTunableNumber(
-          "AutoScore/MaxDistanceSuperstructurePreScore", Units.inchesToMeters(36.0));
+      new LoggedTunableNumber("AutoScore/MinDistanceReefClear", Units.inchesToMeters(12.0));
+  private static final LoggedTunableNumber distanceSuperstructureReady =
+      new LoggedTunableNumber("AutoScore/DistanceSuperstructureReady", Units.inchesToMeters(72.0));
   private static final LoggedTunableNumber[] linearXToleranceEject = {
     new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L1", 0.05),
     new LoggedTunableNumber("AutoScore/LinearXToleranceEject/L2", 0.05),
@@ -109,11 +107,13 @@ public class AutoScore {
                 .get()
                 .map(objective -> getRobotPose(objective, superstructure.hasAlgae()))
                 .orElseGet(() -> RobotState.getInstance().getEstimatedPose());
+
     Function<CoralObjective, Pose2d> goal =
         objective ->
             objective.reefLevel() == ReefLevel.L1
-                ? getL1Pose(robot.get(), objective)
+                ? getL1Pose(objective)
                 : getCoralScorePose(objective, superstructure.hasAlgae());
+
     Container<CoralObjective> coralObjectiveScored = new Container<>();
     Container<Boolean> needsToGetBack = new Container<>(false);
     Container<Boolean> hasEnded = new Container<>(false);
@@ -125,11 +125,38 @@ public class AutoScore {
                 coralObjective
                     .get()
                     .map(
-                        objective ->
-                            getDriveTarget(
-                                robot.get(),
-                                AllianceFlipUtil.apply(goal.apply(objective)),
-                                superstructure))
+                        objective -> {
+                          if (reefLevel.get() == ReefLevel.L1) {
+                            return getDriveTarget(
+                                robot.get(), AllianceFlipUtil.apply(getL1Pose(objective)));
+                          }
+                          Pose2d goalPose = getCoralScorePose(objective, superstructure.hasAlgae());
+                          if (superstructure.hasAlgae()
+                              && !superstructure.getState().getValue().isReversed()) {
+                            goalPose =
+                                goalPose.transformBy(
+                                    GeomUtil.toTransform2d(
+                                        goalPose.getTranslation().getDistance(Reef.center)
+                                            - reefRadius
+                                            - (DriveConstants.robotWidth / 2.0)
+                                            - minDistanceReefClearAlgae.get(),
+                                        0.0));
+                          } else if (!superstructure.hasAlgae()
+                              && superstructure.getState()
+                                  != Superstructure.getScoringState(reefLevel.get(), false, false)
+                              && superstructure.getState()
+                                  != Superstructure.getScoringState(reefLevel.get(), false, true)) {
+                            goalPose =
+                                goalPose.transformBy(
+                                    GeomUtil.toTransform2d(
+                                        goalPose.getTranslation().getDistance(Reef.center)
+                                            - reefRadius
+                                            - (DriveConstants.robotWidth / 2.0)
+                                            - minDistanceReefClear.get(),
+                                        0.0));
+                          }
+                          return getDriveTarget(robot.get(), AllianceFlipUtil.apply(goalPose));
+                        })
                     .orElseGet(() -> RobotState.getInstance().getEstimatedPose()),
             robot,
             () ->
@@ -143,12 +170,9 @@ public class AutoScore {
 
     // Schedule get back command
     new Trigger(() -> hasEnded.value && needsToGetBack.value)
+        .and(RobotModeTriggers.teleop())
         .onTrue(
-            getSuperstructureGetBackCommand(
-                    superstructure,
-                    () ->
-                        Superstructure.getScoringState(
-                            reefLevel.get(), superstructure.hasAlgae(), false))
+            getSuperstructureGetBackCommand(superstructure, superstructure::getState)
                 .andThen(() -> needsToGetBack.value = false));
 
     return Commands.runOnce(
@@ -170,14 +194,14 @@ public class AutoScore {
             // Check if need wait until pre ready or already ready
             Commands.waitUntil(
                 () -> {
-                  boolean ready = readyToSuperstructure(robot.get(), superstructure);
+                  boolean ready =
+                      withinDistanceToReef(robot.get(), distanceSuperstructureReady.get());
                   Logger.recordOutput("AutoScore/AllowPreReady", ready);
 
                   // Get back!
-                  if (ready && superstructure.hasAlgae()) {
+                  if (ready) {
                     needsToGetBack.value = true;
                   }
-
                   return ready;
                 }),
             getSuperstructureAimAndEjectCommand(
@@ -279,11 +303,34 @@ public class AutoScore {
     Container<Boolean> needsToGetBack = new Container<>(false);
     Container<Boolean> hasEnded = new Container<>(false);
 
+    Supplier<Pose2d> goal =
+        () -> {
+          Pose2d goalPose =
+              algaeObjective
+                  .get()
+                  .map(objective -> AllianceFlipUtil.apply(getReefIntakePose(objective)))
+                  .orElseGet(
+                      () ->
+                          algaeIntaked.value == null
+                              ? robot.get()
+                              : AllianceFlipUtil.apply(getReefIntakePose(algaeIntaked.value)));
+          if (algaeObjective.get().isEmpty() && algaeIntaked.value == null) {
+            return goalPose;
+          }
+          if (superstructure.hasAlgae()) {
+            return goalPose.transformBy(
+                GeomUtil.toTransform2d(-minDistanceReefClearAlgae.get(), 0.0));
+          }
+          return goalPose;
+        };
+
     // Schedule get back command
     new Trigger(() -> hasEnded.value && needsToGetBack.value)
+        .and(RobotModeTriggers.teleop())
         .onTrue(
             getSuperstructureGetBackCommand(superstructure, algaeIntakeState)
                 .andThen(() -> needsToGetBack.value = false));
+
     return Commands.runOnce(
             () -> {
               // Reset State
@@ -294,24 +341,7 @@ public class AutoScore {
         .andThen(
             new DriveToPose(
                 drive,
-                () ->
-                    algaeObjective
-                        .get()
-                        .map(
-                            objective ->
-                                getDriveTarget(
-                                    robot.get(),
-                                    AllianceFlipUtil.apply(getReefIntakePose(objective)),
-                                    superstructure))
-                        .orElseGet(
-                            () ->
-                                algaeIntaked.value == null
-                                    ? robot.get()
-                                    : getDriveTarget(
-                                        robot.get(),
-                                        AllianceFlipUtil.apply(
-                                            getReefIntakePose(algaeIntaked.value)),
-                                        superstructure)),
+                () -> getDriveTarget(robot.get(), goal.get()),
                 robot,
                 () ->
                     DriveCommands.getLinearVelocityFromJoysticks(
@@ -322,13 +352,16 @@ public class AutoScore {
                         deadbandedTheta.getAsDouble() * deadbandedTheta.getAsDouble(),
                         deadbandedTheta.getAsDouble())))
         .alongWith(
-            superstructure.runGoal(algaeIntakeState),
+            superstructure
+                .runGoal(algaeIntakeState)
+                .alongWith(
+                    Commands.waitUntil(() -> superstructure.getState() == algaeIntakeState.get()),
+                    Commands.runOnce(() -> needsToGetBack.value = true)),
             Commands.waitUntil(superstructure::hasAlgae)
                 .andThen(
                     Commands.runOnce(
                             () -> {
-                              needsToGetBack.value = true;
-                              algaeIntaked.value = algaeObjective.get().get();
+                              algaeIntaked.value = algaeObjective.get().orElse(null);
                             })
                         .andThen(requestAlgaeIntakedCommand.apply(() -> algaeIntaked.value))
                         .onlyIf(() -> algaeObjective.get().isPresent())))
@@ -365,7 +398,7 @@ public class AutoScore {
                                 getRobotPose(objective, superstructure.hasAlgae())
                                     .transformBy(
                                         GeomUtil.toTransform2d(
-                                            DispenserPose.fromReefLevel(
+                                            DispenserPose.forCoralScore(
                                                             objective.reefLevel(),
                                                             superstructure.hasAlgae())
                                                         .getElevatorHeight()
@@ -398,24 +431,17 @@ public class AutoScore {
         .runGoal(holdState)
         .until(
             () ->
-                AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose())
-                        .getTranslation()
-                        .getDistance(FieldConstants.Reef.center)
-                    >= FieldConstants.Reef.faceLength
-                        + DriveConstants.robotWidth / 2.0
-                        + AutoScore.minDistanceReefClear.get())
-        .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming)
+                superstructure.hasAlgae()
+                    ? outOfDistanceToReef(
+                        RobotState.getInstance().getEstimatedPose(),
+                        minDistanceReefClearAlgae.get())
+                    : outOfDistanceToReef(
+                        RobotState.getInstance().getEstimatedPose(), minDistanceReefClear.get()))
         .withName("Superstructure Get Back!");
   }
 
   /** Get drive target. */
-  private static Pose2d getDriveTarget(Pose2d robot, Pose2d goal, Superstructure superstructure) {
-    // If superstructure isn't ready move back away from reef
-    if (superstructure.hasAlgae() && !superstructure.getState().getValue().isReversed()) {
-      goal = goal.transformBy(GeomUtil.toTransform2d(-minDistanceReefClear.get(), 0.0));
-    }
-
-    // Final line up
+  private static Pose2d getDriveTarget(Pose2d robot, Pose2d goal) {
     var offset = robot.relativeTo(goal);
     double yDistance = Math.abs(offset.getY());
     double xDistance = Math.abs(offset.getX());
@@ -424,7 +450,8 @@ public class AutoScore {
             (yDistance / (Reef.faceLength * 2)) + ((xDistance - 0.3) / (Reef.faceLength * 3)),
             0.0,
             1.0);
-    double shiftYT = MathUtil.clamp(offset.getX() / Reef.faceLength, 0.0, 1.0);
+    double shiftYT =
+        MathUtil.clamp(yDistance <= 0.2 ? 0.0 : offset.getX() / Reef.faceLength, 0.0, 1.0);
     return goal.transformBy(
         GeomUtil.toTransform2d(
             -shiftXT * maxDistanceReefLineup.get(),
@@ -433,32 +460,18 @@ public class AutoScore {
 
   /** Get position of robot aligned with branch for selected objective. */
   public static Pose2d getCoralScorePose(CoralObjective coralObjective, boolean algae) {
-    var dispenserPose = DispenserPose.fromReefLevel(coralObjective.reefLevel(), algae);
-    return getBranchPose(coralObjective) // Use dispenser pose relative to branch to find robot pose
-        .transformBy(
-            GeomUtil.toTransform2d(
-                dispenserPose.getElevatorHeight() * SuperstructureConstants.elevatorAngle.getCos()
-                    + dispenserPose.getPose().getX()
-                    + SuperstructureConstants.dispenserOrigin2d.getX(),
-                0.0))
-        .transformBy(GeomUtil.toTransform2d(Rotation2d.kPi));
+    return getBranchPose(coralObjective)
+        .transformBy(DispenserPose.forCoralScore(coralObjective.reefLevel(), algae).toRobotPose());
   }
 
   public static Pose2d getReefIntakePose(AlgaeObjective objective) {
-    var dispenserPose = DispenserPose.fromAlgaeObjective(objective);
     int branchId = objective.id() * 2;
     return getBranchPose(new CoralObjective(branchId, ReefLevel.L3))
         .interpolate(getBranchPose(new CoralObjective(branchId + 1, ReefLevel.L3)), 0.5)
-        .transformBy(
-            GeomUtil.toTransform2d(
-                dispenserPose.getElevatorHeight() * SuperstructureConstants.elevatorAngle.getCos()
-                    + dispenserPose.getPose().getX()
-                    + SuperstructureConstants.dispenserOrigin2d.getX(),
-                0.0))
-        .transformBy(GeomUtil.toTransform2d(Rotation2d.kPi));
+        .transformBy(DispenserPose.forAlgaeIntake(objective).toRobotPose());
   }
 
-  private static Pose2d getL1Pose(Pose2d robot, CoralObjective coralObjective) {
+  private static Pose2d getL1Pose(CoralObjective coralObjective) {
     int face = coralObjective.branchId() / 2;
     return Reef.centerFaces[face].transformBy(
         new Transform2d(
@@ -468,18 +481,18 @@ public class AutoScore {
                 l1AlignOffsetDegrees.get() * (coralObjective.branchId() % 2 == 0 ? 1.0 : -1.0))));
   }
 
-  /** Get whether prescore is allowed without reef interaction. */
-  private static boolean readyToSuperstructure(Pose2d robot, Superstructure superstructure) {
-    robot = AllianceFlipUtil.apply(robot);
-    final double distanceToReefCenter = robot.getTranslation().getDistance(Reef.center);
+  private static boolean withinDistanceToReef(Pose2d robot, double distance) {
+    final double distanceToReefCenter =
+        AllianceFlipUtil.apply(robot).getTranslation().getDistance(Reef.center);
     Logger.recordOutput("AutoScore/DistanceToReefCenter", distanceToReefCenter);
-    boolean withinMaxDistance =
-        distanceToReefCenter
-            <= reefRadius
-                + DriveConstants.robotWidth / 2.0
-                + maxDistanceSuperstructurePreScore.get();
-    Logger.recordOutput("AutoScore/WithinMaxDistance", withinMaxDistance);
-    return withinMaxDistance;
+    return distanceToReefCenter <= reefRadius + DriveConstants.robotWidth / 2.0 + distance;
+  }
+
+  private static boolean outOfDistanceToReef(Pose2d robot, double distance) {
+    final double distanceToReefCenter =
+        AllianceFlipUtil.apply(robot).getTranslation().getDistance(Reef.center);
+    Logger.recordOutput("AutoScore/DistanceToReefCenter", distanceToReefCenter);
+    return distanceToReefCenter >= reefRadius + DriveConstants.robotWidth / 2.0 + distance;
   }
 
   private static Pose2d getRobotPose(CoralObjective coralObjective, boolean hasAlgae) {
