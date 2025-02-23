@@ -13,6 +13,8 @@ import edu.wpi.first.math.geometry.*;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.util.Color;
 import edu.wpi.first.wpilibj.util.Color8Bit;
+import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
@@ -61,12 +63,14 @@ public class SuperstructureVisualizer {
       Rotation2d pivotFinalAngle,
       double algaeIntakePosition,
       boolean hasAlgae) {
-    elevatorMechanism.setLength(
-        EqualsUtil.epsilonEquals(elevatorHeightMeters, 0.0)
-            ? Units.inchesToMeters(1.0)
-            : elevatorHeightMeters);
-    pivotMechanism.setAngle(pivotFinalAngle.minus(elevatorAngle));
-    Logger.recordOutput("Mechanism2d/" + name, mechanism);
+    if (Constants.getMode() != Mode.REAL) {
+      elevatorMechanism.setLength(
+          EqualsUtil.epsilonEquals(elevatorHeightMeters, 0.0)
+              ? Units.inchesToMeters(1.0)
+              : elevatorHeightMeters);
+      pivotMechanism.setAngle(pivotFinalAngle.minus(elevatorAngle));
+      Logger.recordOutput("Mechanism2d/" + name, mechanism);
+    }
 
     // Max of top of carriage or starting height
     final double heightFromBottom =

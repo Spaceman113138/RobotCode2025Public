@@ -101,12 +101,12 @@ public abstract class GenericSlamElevator<G extends GenericSlamElevator.SlamElev
     lastGoal = getGoal();
 
     // Set alert
-    disconnected.set(!inputs.motorConnected);
+    disconnected.set(!inputs.data.motorConnected());
 
     // Check if at goal.
     if (!slammed) {
       // Start static timer if within min velocity threshold.
-      if (Math.abs(inputs.velocityRadsPerSec) <= minVelocityThresh) {
+      if (Math.abs(inputs.data.velocityRadsPerSec()) <= minVelocityThresh) {
         staticTimer.start();
       } else {
         staticTimer.stop();
@@ -137,7 +137,7 @@ public abstract class GenericSlamElevator<G extends GenericSlamElevator.SlamElev
       lastGoal = null;
       staticTimer.stop();
       staticTimer.reset();
-      if (Math.abs(inputs.velocityRadsPerSec) > minVelocityThresh) {
+      if (Math.abs(inputs.data.velocityRadsPerSec()) > minVelocityThresh) {
         // If we don't move when disabled, assume we are still at goal
         slammed = false;
       }

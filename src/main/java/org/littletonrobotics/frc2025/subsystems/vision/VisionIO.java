@@ -14,7 +14,6 @@ public interface VisionIO {
   class AprilTagVisionIOInputs {
     public double[] timestamps = new double[] {};
     public double[][] frames = new double[][] {};
-    public double[] demoFrame = new double[] {};
     public long fps = 0;
   }
 

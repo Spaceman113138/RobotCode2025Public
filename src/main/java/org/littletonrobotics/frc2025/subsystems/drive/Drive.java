@@ -29,6 +29,7 @@ import lombok.Setter;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.RobotState;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.swerve.SwerveSetpoint;
 import org.littletonrobotics.frc2025.util.swerve.SwerveSetpointGenerator;
@@ -105,6 +106,7 @@ public class Drive extends SubsystemBase {
       module.updateInputs();
     }
     odometryLock.unlock();
+    LoggedTracer.record("Drive/Inputs");
 
     // Call periodic on modules
     for (var module : modules) {
@@ -126,7 +128,9 @@ public class Drive extends SubsystemBase {
 
     // Send odometry updates to robot state
     double[] sampleTimestamps =
-        modules[0].getOdometryTimestamps(); // All signals are sampled together
+        Constants.getMode() == Mode.SIM
+            ? new double[] {Timer.getTimestamp()}
+            : gyroInputs.odometryYawTimestamps; // All signals are sampled together
     int sampleCount = sampleTimestamps.length;
     for (int i = 0; i < sampleCount; i++) {
       SwerveModulePosition[] wheelPositions = new SwerveModulePosition[4];
@@ -138,7 +142,7 @@ public class Drive extends SubsystemBase {
               new RobotState.OdometryObservation(
                   wheelPositions,
                   Optional.ofNullable(
-                      gyroInputs.connected ? gyroInputs.odometryYawPositions[i] : null),
+                      gyroInputs.data.connected() ? gyroInputs.odometryYawPositions[i] : null),
                   sampleTimestamps[i]));
     }
 
@@ -179,7 +183,10 @@ public class Drive extends SubsystemBase {
     }
 
     // Update gyro alert
-    gyroDisconnectedAlert.set(!gyroInputs.connected && Constants.getMode() != Mode.SIM);
+    gyroDisconnectedAlert.set(!gyroInputs.data.connected() && Constants.getMode() != Mode.SIM);
+
+    // Record cycle time
+    LoggedTracer.record("Drive/Periodic");
   }
 
   /** Set brake mode to {@code enabled} doesn't change brake mode if already set. */
@@ -327,7 +334,7 @@ public class Drive extends SubsystemBase {
 
   /** Returns the raw gyro rotation read by the IMU */
   public Rotation2d getGyroRotation() {
-    return gyroInputs.yawPosition;
+    return gyroInputs.data.yawPosition();
   }
 
   /** Returns the maximum linear speed in meters per sec. */

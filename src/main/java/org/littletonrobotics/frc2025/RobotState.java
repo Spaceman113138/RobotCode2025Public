@@ -19,7 +19,6 @@ import edu.wpi.first.math.kinematics.SwerveModulePosition;
 import edu.wpi.first.math.numbers.N1;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -262,7 +261,6 @@ public class RobotState {
   /** Get 2d pose estimate of robot if not stale. */
   public Optional<Pose2d> getTxTyPose(int tagId) {
     if (!txTyPoses.containsKey(tagId)) {
-      DriverStation.reportError("No tag with id: " + tagId, true);
       return Optional.empty();
     }
     var data = txTyPoses.get(tagId);
@@ -365,12 +363,11 @@ public class RobotState {
 
   public void periodicLog() {
     // Log tx/ty poses
-    for (var tag : FieldConstants.defaultAprilTagType.getLayout().getTags()) {
-      var pose = getTxTyPose(tag.ID);
-      Logger.recordOutput(
-          "RobotState/TxTyPoses/" + Integer.toString(tag.ID),
-          pose.isPresent() ? new Pose2d[] {pose.get()} : new Pose2d[] {});
+    Pose2d[] tagPoses = new Pose2d[FieldConstants.aprilTagCount + 1];
+    for (int i = 0; i < FieldConstants.aprilTagCount + 1; i++) {
+      tagPoses[i] = getTxTyPose(i).orElse(Pose2d.kZero);
     }
+    Logger.recordOutput("RobotState/TxTyPoses", tagPoses);
 
     // Log algae poses
     Logger.recordOutput(

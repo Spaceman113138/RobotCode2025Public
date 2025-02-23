@@ -30,6 +30,7 @@ import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOInputsAutoLogged;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -149,12 +150,12 @@ public class Dispenser {
     Logger.processInputs("Dispenser/Gripper", gripperInputs);
 
     pivotMotorDisconnectedAlert.set(
-        !pivotInputs.motorConnected && Constants.getRobot() == RobotType.COMPBOT);
+        !pivotInputs.data.motorConnected() && Constants.getRobot() == RobotType.COMPBOT);
     pivotEncoderDisconnectedAlert.set(
-        !pivotInputs.encoderConnected && Constants.getRobot() == RobotType.COMPBOT);
-    tunnelDisconnectedAlert.set(!tunnelInputs.connected);
+        !pivotInputs.data.encoderConnected() && Constants.getRobot() == RobotType.COMPBOT);
+    tunnelDisconnectedAlert.set(!tunnelInputs.data.connected());
     gripperDisconnectedAlert.set(
-        !gripperInputs.connected && Constants.getRobot() == RobotType.COMPBOT);
+        !gripperInputs.data.connected() && Constants.getRobot() == RobotType.COMPBOT);
 
     // Update tunable numbers
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
@@ -232,12 +233,15 @@ public class Dispenser {
     if (Constants.getRobot() != Constants.RobotType.SIMBOT) {
       hasAlgae =
           algaeDebouncer.calculate(
-              Math.abs(gripperInputs.supplyCurrentAmps) >= algaeIntakeCurrentThresh.get());
+              Math.abs(gripperInputs.data.supplyCurrentAmps()) >= algaeIntakeCurrentThresh.get());
     }
 
     // Log state
     Logger.recordOutput("Dispenser/CoastOverride", coastOverride.getAsBoolean());
     Logger.recordOutput("Dispenser/DisabledOverride", disabledOverride.getAsBoolean());
+
+    // Record cycle time
+    LoggedTracer.record("Dispenser");
   }
 
   public void setGoal(Supplier<Rotation2d> goal) {
@@ -255,7 +259,7 @@ public class Dispenser {
   }
 
   public Rotation2d getPivotAngle() {
-    return pivotInputs.internalPosition;
+    return pivotInputs.data.internalPosition();
   }
 
   public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
@@ -283,7 +287,9 @@ public class Dispenser {
               Logger.recordOutput(
                   "Dispenser/StaticCharacterizationOutput", state.characterizationOutput);
             })
-        .until(() -> pivotInputs.velocityRadPerSec >= staticCharacterizationVelocityThresh.get())
+        .until(
+            () ->
+                pivotInputs.data.velocityRadPerSec() >= staticCharacterizationVelocityThresh.get())
         .finallyDo(
             () -> {
               stopProfile = false;

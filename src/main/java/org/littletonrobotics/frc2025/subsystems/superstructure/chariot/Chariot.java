@@ -19,6 +19,7 @@ import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOInputsAutoLogged;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator;
 import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator.SlamElevatorGoal;
@@ -70,13 +71,13 @@ public class Chariot extends GenericSlamElevator<Chariot.Goal> {
     this.rollerIO = rollerIO;
 
     new Trigger(() -> getGoal() == Goal.RETRACT && slammed)
-        .onTrue(Commands.runOnce(() -> home = inputs.positionRads * drumRadius));
+        .onTrue(Commands.runOnce(() -> home = inputs.data.positionRads() * drumRadius));
     new Trigger(() -> getGoal() == Goal.DEPLOY && slammed)
         .onTrue(
             Commands.runOnce(
                 () ->
                     home =
-                        inputs.positionRads * drumRadius
+                        inputs.data.positionRads() * drumRadius
                             - SuperstructureConstants.chariotMaxExtension));
   }
 
@@ -89,12 +90,15 @@ public class Chariot extends GenericSlamElevator<Chariot.Goal> {
       slammed = true;
     }
 
-    position = inputs.positionRads * drumRadius - home;
+    position = inputs.data.positionRads() * drumRadius - home;
     if (getGoal() == Goal.HALF_OUT
         && position >= Units.inchesToMeters(halfOutPositionInches.get())) {
       slammed = true;
     }
 
     rollerIO.runVolts(intakeVolts);
+
+    // Record cycle time
+    LoggedTracer.record("Chariot");
   }
 }

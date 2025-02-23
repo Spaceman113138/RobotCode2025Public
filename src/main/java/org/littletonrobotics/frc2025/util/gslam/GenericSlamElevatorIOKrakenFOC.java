@@ -19,6 +19,7 @@ import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.units.measure.*;
+import org.littletonrobotics.frc2025.util.PhoenixUtil;
 
 public class GenericSlamElevatorIOKrakenFOC implements GenericSlamElevatorIO {
   // Hardware
@@ -58,22 +59,25 @@ public class GenericSlamElevatorIOKrakenFOC implements GenericSlamElevatorIO {
 
     BaseStatusSignal.setUpdateFrequencyForAll(
         50.0, position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, temp);
-
     talon.optimizeBusUtilization(0, 1.0);
+
+    // Register signals for refresh
+    PhoenixUtil.registerSignals(
+        position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, temp);
   }
 
   @Override
   public void updateInputs(GenericSlamElevatorIOInputs inputs) {
-    inputs.motorConnected =
-        BaseStatusSignal.refreshAll(
-                position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, temp)
-            .isOK();
-    inputs.positionRads = position.getValue().in(Radians);
-    inputs.velocityRadsPerSec = velocity.getValue().in(RadiansPerSecond);
-    inputs.appliedVoltage = appliedVoltage.getValueAsDouble();
-    inputs.supplyCurrentAmps = supplyCurrent.getValueAsDouble();
-    inputs.torqueCurrentAmps = torqueCurrent.getValueAsDouble();
-    inputs.tempCelsius = temp.getValue().in(Celsius);
+    inputs.data =
+        new GenericSlamElevatorIOData(
+            BaseStatusSignal.isAllGood(
+                position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, temp),
+            position.getValue().in(Radians),
+            velocity.getValue().in(RadiansPerSecond),
+            appliedVoltage.getValueAsDouble(),
+            supplyCurrent.getValueAsDouble(),
+            torqueCurrent.getValueAsDouble(),
+            temp.getValue().in(Celsius));
   }
 
   @Override

@@ -7,6 +7,7 @@
 
 package org.littletonrobotics.frc2025.util;
 
+import com.ctre.phoenix6.BaseStatusSignal;
 import com.ctre.phoenix6.StatusCode;
 import java.util.function.Supplier;
 
@@ -17,5 +18,21 @@ public class PhoenixUtil {
       var error = command.get();
       if (error.isOK()) break;
     }
+  }
+
+  /** Signals for synchronized refresh. */
+  private static BaseStatusSignal[] allSignals = new BaseStatusSignal[0];
+
+  /** Registers a signal for synchronized refresh. */
+  public static void registerSignals(BaseStatusSignal... signals) {
+    BaseStatusSignal[] newSignals = new BaseStatusSignal[allSignals.length + signals.length];
+    System.arraycopy(allSignals, 0, newSignals, 0, allSignals.length);
+    System.arraycopy(signals, 0, newSignals, allSignals.length, signals.length);
+    allSignals = newSignals;
+  }
+
+  /** Refresh all regisstered signals. */
+  public static void refreshAll() {
+    BaseStatusSignal.refreshAll(allSignals);
   }
 }

@@ -11,12 +11,20 @@ import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.util.Units;
 import lombok.Builder;
+import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.util.swerve.ModuleLimits;
 
 public class DriveConstants {
   public static final double odometryFrequency = 250;
-  public static final double trackWidthX = Units.inchesToMeters(20.75);
-  public static final double trackWidthY = Units.inchesToMeters(20.75);
+  public static final double trackWidthX =
+      Constants.getRobot() == RobotType.DEVBOT
+          ? Units.inchesToMeters(20.75)
+          : Units.inchesToMeters(22.75);
+  public static final double trackWidthY =
+      Constants.getRobot() == RobotType.DEVBOT
+          ? Units.inchesToMeters(20.75)
+          : Units.inchesToMeters(22.75);
   public static final double driveBaseRadius = Math.hypot(trackWidthX / 2, trackWidthY / 2);
   public static final double maxLinearSpeed = 4.69;
   public static final double maxAngularSpeed = 4.69 / driveBaseRadius;
@@ -40,37 +48,37 @@ public class DriveConstants {
   public static final ModuleConfig[] moduleConfigsComp = {
     // FL
     ModuleConfig.builder()
-        .driveMotorId(3)
-        .turnMotorId(2)
-        .encoderChannel(1)
-        .encoderOffset(Rotation2d.fromRotations(0.0))
+        .driveMotorId(16)
+        .turnMotorId(15)
+        .encoderChannel(41)
+        .encoderOffset(Rotation2d.fromRadians(2.5356702423749646))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // FR
     ModuleConfig.builder()
-        .driveMotorId(1)
-        .turnMotorId(0)
-        .encoderChannel(0)
-        .encoderOffset(Rotation2d.fromRotations(0.0))
+        .driveMotorId(10)
+        .turnMotorId(11)
+        .encoderChannel(42)
+        .encoderOffset(Rotation2d.fromRadians(-1.872990542008368))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // BL
     ModuleConfig.builder()
-        .driveMotorId(7)
-        .turnMotorId(6)
-        .encoderChannel(3)
-        .encoderOffset(Rotation2d.fromRotations(0.0))
+        .driveMotorId(18)
+        .turnMotorId(19)
+        .encoderChannel(43)
+        .encoderOffset(Rotation2d.fromRadians(0.6458059116998549))
         .turnInverted(true)
         .encoderInverted(false)
         .build(),
     // BR
     ModuleConfig.builder()
-        .driveMotorId(5)
-        .turnMotorId(4)
-        .encoderChannel(2)
-        .encoderOffset(Rotation2d.fromRotations(0.0))
+        .driveMotorId(13)
+        .turnMotorId(14)
+        .encoderChannel(44)
+        .encoderOffset(Rotation2d.fromRadians(-2.5187964537082226))
         .turnInverted(true)
         .encoderInverted(false)
         .build()
@@ -116,7 +124,7 @@ public class DriveConstants {
   };
 
   public static class PigeonConstants {
-    public static final int id = 3;
+    public static final int id = Constants.getRobot() == RobotType.DEVBOT ? 3 : 30;
   }
 
   @Builder

@@ -16,6 +16,7 @@ import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
 
@@ -100,7 +101,7 @@ public class Module {
     }
 
     // Calculate positions for odometry
-    int sampleCount = inputs.odometryTimestamps.length; // All signals are sampled together
+    int sampleCount = inputs.odometryDrivePositionsRad.length; // All signals are sampled together
     odometryPositions = new SwerveModulePosition[sampleCount];
     for (int i = 0; i < sampleCount; i++) {
       double positionMeters = inputs.odometryDrivePositionsRad[i] * DriveConstants.wheelRadius;
@@ -109,9 +110,12 @@ public class Module {
     }
 
     // Update alerts
-    driveDisconnectedAlert.set(!inputs.driveConnected);
-    turnDisconnectedAlert.set(!inputs.turnConnected);
-    turnEncoderDisconnectedAlert.set(!inputs.turnEncoderConnected);
+    driveDisconnectedAlert.set(!inputs.data.driveConnected());
+    turnDisconnectedAlert.set(!inputs.data.turnConnected());
+    turnEncoderDisconnectedAlert.set(!inputs.data.turnEncoderConnected());
+
+    // Record cycle time
+    LoggedTracer.record("Drive/Module" + index);
   }
 
   /** Runs the module with the specified setpoint state. */
@@ -148,17 +152,17 @@ public class Module {
 
   /** Returns the current turn angle of the module. */
   public Rotation2d getAngle() {
-    return inputs.turnPosition;
+    return inputs.data.turnPosition();
   }
 
   /** Returns the current drive position of the module in meters. */
   public double getPositionMeters() {
-    return inputs.drivePositionRad * DriveConstants.wheelRadius;
+    return inputs.data.drivePositionRad() * DriveConstants.wheelRadius;
   }
 
   /** Returns the current drive velocity of the module in meters per second. */
   public double getVelocityMetersPerSec() {
-    return inputs.driveVelocityRadPerSec * DriveConstants.wheelRadius;
+    return inputs.data.driveVelocityRadPerSec() * DriveConstants.wheelRadius;
   }
 
   /** Returns the module position (turn angle and drive position). */
@@ -176,19 +180,14 @@ public class Module {
     return odometryPositions;
   }
 
-  /** Returns the timestamps of the samples received this cycle. */
-  public double[] getOdometryTimestamps() {
-    return inputs.odometryTimestamps;
-  }
-
   /** Returns the module position in radians. */
   public double getWheelRadiusCharacterizationPosition() {
-    return inputs.drivePositionRad;
+    return inputs.data.drivePositionRad();
   }
 
   /** Returns the module velocity in rotations/sec (Phoenix native units). */
   public double getFFCharacterizationVelocity() {
-    return Units.radiansToRotations(inputs.driveVelocityRadPerSec);
+    return Units.radiansToRotations(inputs.data.driveVelocityRadPerSec());
   }
 
   /* Sets brake mode to {@code enabled} */

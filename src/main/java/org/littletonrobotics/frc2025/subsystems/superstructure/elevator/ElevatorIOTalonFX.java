@@ -24,6 +24,9 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.units.measure.*;
+import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.RobotType;
+import org.littletonrobotics.frc2025.util.PhoenixUtil;
 
 public class ElevatorIOTalonFX implements ElevatorIO {
   public static final double reduction = 4.0;
@@ -56,8 +59,8 @@ public class ElevatorIOTalonFX implements ElevatorIO {
   private final VoltageOut voltageRequest = new VoltageOut(0.0).withUpdateFreqHz(0.0);
 
   public ElevatorIOTalonFX() {
-    talon = new TalonFX(13, "*");
-    followerTalon = new TalonFX(14, "*");
+    talon = new TalonFX(Constants.getRobot() == RobotType.DEVBOT ? 13 : 17, "*");
+    followerTalon = new TalonFX(Constants.getRobot() == RobotType.DEVBOT ? 14 : 9, "*");
     followerTalon.setControl(new Follower(talon.getDeviceID(), true));
 
     // Configure motor
@@ -82,33 +85,57 @@ public class ElevatorIOTalonFX implements ElevatorIO {
     followerSupplyCurrent = followerTalon.getSupplyCurrent();
     followerTemp = followerTalon.getDeviceTemp();
 
-    BaseStatusSignal.setUpdateFrequencyForAll(50.0, position, velocity, appliedVolts, temp);
+    BaseStatusSignal.setUpdateFrequencyForAll(
+        50.0,
+        position,
+        velocity,
+        appliedVolts,
+        supplyCurrent,
+        temp,
+        followerAppliedVolts,
+        followerTorqueCurrent,
+        followerSupplyCurrent,
+        followerTemp);
     torqueCurrent.setUpdateFrequency(1000);
-    ParentDevice.optimizeBusUtilizationForAll(talon);
+    ParentDevice.optimizeBusUtilizationForAll(talon, followerTalon);
+
+    // Register signals for refresh
+    PhoenixUtil.registerSignals(
+        position,
+        velocity,
+        appliedVolts,
+        torqueCurrent,
+        supplyCurrent,
+        temp,
+        followerAppliedVolts,
+        followerTorqueCurrent,
+        followerSupplyCurrent,
+        followerTemp);
   }
 
   @Override
   public void updateInputs(ElevatorIOInputs inputs) {
-    boolean connected =
-        BaseStatusSignal.refreshAll(
-                position, velocity, appliedVolts, torqueCurrent, supplyCurrent, temp)
-            .isOK();
-    boolean followerConnected =
-        BaseStatusSignal.refreshAll(
-                followerAppliedVolts, followerTorqueCurrent, followerSupplyCurrent, followerTemp)
-            .isOK();
-
-    inputs.motorConnected = connectedDebouncer.calculate(connected);
-    inputs.followerConnected = connectedDebouncer.calculate(followerConnected);
-    inputs.positionRad = Units.rotationsToRadians(position.getValueAsDouble());
-    inputs.velocityRadPerSec = Units.rotationsToRadians(velocity.getValueAsDouble());
-    inputs.appliedVolts =
-        new double[] {appliedVolts.getValueAsDouble(), followerAppliedVolts.getValueAsDouble()};
-    inputs.torqueCurrentAmps =
-        new double[] {torqueCurrent.getValueAsDouble(), followerTorqueCurrent.getValueAsDouble()};
-    inputs.supplyCurrentAmps =
-        new double[] {supplyCurrent.getValueAsDouble(), followerSupplyCurrent.getValueAsDouble()};
-    inputs.tempCelsius = new double[] {temp.getValueAsDouble(), followerTemp.getValueAsDouble()};
+    inputs.data =
+        new ElevatorIOData(
+            connectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    position, velocity, appliedVolts, torqueCurrent, supplyCurrent, temp)),
+            connectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    followerAppliedVolts,
+                    followerTorqueCurrent,
+                    followerSupplyCurrent,
+                    followerTemp)),
+            Units.rotationsToRadians(position.getValueAsDouble()),
+            Units.rotationsToRadians(velocity.getValueAsDouble()),
+            appliedVolts.getValueAsDouble(),
+            torqueCurrent.getValueAsDouble(),
+            supplyCurrent.getValueAsDouble(),
+            temp.getValueAsDouble(),
+            followerAppliedVolts.getValueAsDouble(),
+            followerTorqueCurrent.getValueAsDouble(),
+            followerSupplyCurrent.getValueAsDouble(),
+            followerTemp.getValueAsDouble());
   }
 
   @Override

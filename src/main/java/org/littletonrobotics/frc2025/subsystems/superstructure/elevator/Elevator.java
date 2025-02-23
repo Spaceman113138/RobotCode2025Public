@@ -26,6 +26,7 @@ import lombok.Setter;
 import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.util.EqualsUtil;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -136,8 +137,8 @@ public class Elevator {
     io.updateInputs(inputs);
     Logger.processInputs("Elevator", inputs);
 
-    motorDisconnectedAlert.set(!inputs.motorConnected);
-    followerDisconnectedAlert.set(!inputs.followerConnected);
+    motorDisconnectedAlert.set(!inputs.data.motorConnected());
+    followerDisconnectedAlert.set(!inputs.data.followerConnected());
 
     // Update tunable numbers
     if (kP.hasChanged(hashCode()) || kD.hasChanged(hashCode())) {
@@ -222,7 +223,10 @@ public class Elevator {
     Logger.recordOutput("Elevator/CoastOverride", coastOverride.getAsBoolean());
     Logger.recordOutput("Elevator/DisabledOverride", disabledOverride.getAsBoolean());
     Logger.recordOutput(
-        "Elevator/MeasuredVelocityMetersPerSec", inputs.velocityRadPerSec * drumRadius);
+        "Elevator/MeasuredVelocityMetersPerSec", inputs.data.velocityRadPerSec() * drumRadius);
+
+    // Record cycle time
+    LoggedTracer.record("Elevator");
   }
 
   public void setGoal(DoubleSupplier goal) {
@@ -259,7 +263,7 @@ public class Elevator {
               Logger.recordOutput(
                   "Elevator/StaticCharacterizationOutput", state.characterizationOutput);
             })
-        .until(() -> inputs.velocityRadPerSec >= staticCharacterizationVelocityThresh.get())
+        .until(() -> inputs.data.velocityRadPerSec() >= staticCharacterizationVelocityThresh.get())
         .finallyDo(
             () -> {
               stopProfile = false;
@@ -281,12 +285,12 @@ public class Elevator {
               io.runVolts(homingVolts.get());
               homed =
                   homingDebouncer.calculate(
-                      Math.abs(inputs.velocityRadPerSec) <= homingVelocityThresh.get());
+                      Math.abs(inputs.data.velocityRadPerSec()) <= homingVelocityThresh.get());
             })
         .until(() -> homed)
         .andThen(
             () -> {
-              homedPosition = inputs.positionRad;
+              homedPosition = inputs.data.positionRad();
               homed = true;
             })
         .finallyDo(
@@ -298,7 +302,7 @@ public class Elevator {
   /** Get position of elevator in meters with 0 at home */
   @AutoLogOutput(key = "Elevator/MeasuredHeightMeters")
   public double getPositionMeters() {
-    return (inputs.positionRad - homedPosition) * drumRadius;
+    return (inputs.data.positionRad() - homedPosition) * drumRadius;
   }
 
   @AutoLogOutput(key = "Elevator/MeasuredStage")

@@ -28,11 +28,12 @@ import com.ctre.phoenix6.signals.SensorDirectionValue;
 import edu.wpi.first.math.filter.Debouncer;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.units.measure.*;
+import org.littletonrobotics.frc2025.util.PhoenixUtil;
 
 public class DispenserIOTalonFX implements DispenserIO {
   public static final double reduction = 3.0;
   private static final Rotation2d offset = new Rotation2d();
-  private static final int encoderId = 0;
+  private static final int encoderId = 45;
 
   // Hardware
   private final TalonFX talon;
@@ -107,35 +108,41 @@ public class DispenserIOTalonFX implements DispenserIO {
     BaseStatusSignal.setUpdateFrequencyForAll(
         250, encoderAbsolutePosition, encoderRelativePosition);
     ParentDevice.optimizeBusUtilizationForAll(talon, encoder);
+
+    // Register signals for refresh
+    PhoenixUtil.registerSignals(
+        internalPosition,
+        internalVelocity,
+        appliedVolts,
+        supplyCurrentAmps,
+        torqueCurrentAmps,
+        temp,
+        encoderAbsolutePosition,
+        encoderRelativePosition);
   }
 
   @Override
   public void updateInputs(DispenserIOInputs inputs) {
-    // Refresh status signals and check if hardware connected
-    boolean motorConnected =
-        BaseStatusSignal.refreshAll(
-                internalPosition,
-                internalVelocity,
-                appliedVolts,
-                supplyCurrentAmps,
-                torqueCurrentAmps,
-                temp)
-            .isOK();
-    boolean encoderConnected =
-        BaseStatusSignal.refreshAll(encoderAbsolutePosition, encoderRelativePosition).isOK();
-
-    inputs.motorConnected = motorConnectedDebouncer.calculate(motorConnected);
-    inputs.encoderConnected = encoderConnectedDebouncer.calculate(encoderConnected);
-    inputs.internalPosition = Rotation2d.fromRotations(internalPosition.getValueAsDouble());
-    inputs.encoderAbsolutePosition =
-        Rotation2d.fromRotations(encoderAbsolutePosition.getValueAsDouble()).minus(offset);
-    inputs.encoderRelativePosition =
-        encoderRelativePosition.getValue().in(Radians) - offset.getRadians();
-    inputs.velocityRadPerSec = internalVelocity.getValue().in(RadiansPerSecond);
-    inputs.appliedVolts = appliedVolts.getValue().in(Volts);
-    inputs.supplyCurrentAmps = supplyCurrentAmps.getValue().in(Amps);
-    inputs.torqueCurrentAmps = torqueCurrentAmps.getValue().in(Amps);
-    inputs.tempCelsius = temp.getValue().in(Celsius);
+    inputs.data =
+        new DispenserIOData(
+            motorConnectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    internalPosition,
+                    internalVelocity,
+                    appliedVolts,
+                    supplyCurrentAmps,
+                    torqueCurrentAmps,
+                    temp)),
+            encoderConnectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(encoderAbsolutePosition, encoderRelativePosition)),
+            Rotation2d.fromRotations(internalPosition.getValueAsDouble()),
+            Rotation2d.fromRotations(encoderAbsolutePosition.getValueAsDouble()).minus(offset),
+            encoderRelativePosition.getValue().in(Radians) - offset.getRadians(),
+            internalVelocity.getValue().in(RadiansPerSecond),
+            appliedVolts.getValue().in(Volts),
+            supplyCurrentAmps.getValue().in(Amps),
+            torqueCurrentAmps.getValue().in(Amps),
+            temp.getValue().in(Celsius));
   }
 
   @Override

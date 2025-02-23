@@ -12,14 +12,18 @@ import org.littletonrobotics.junction.AutoLog;
 public interface GenericSlamElevatorIO {
   @AutoLog
   class GenericSlamElevatorIOInputs {
-    public boolean motorConnected = true;
-    public double positionRads = 0.0;
-    public double velocityRadsPerSec = 0.0;
-    public double appliedVoltage = 0.0;
-    public double supplyCurrentAmps = 0.0;
-    public double torqueCurrentAmps = 0.0;
-    public double tempCelsius = 0.0;
+    public GenericSlamElevatorIOData data =
+        new GenericSlamElevatorIOData(false, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   }
+
+  record GenericSlamElevatorIOData(
+      boolean motorConnected,
+      double positionRads,
+      double velocityRadsPerSec,
+      double appliedVoltage,
+      double supplyCurrentAmps,
+      double torqueCurrentAmps,
+      double tempCelsius) {}
 
   /** Update the inputs. */
   default void updateInputs(GenericSlamElevatorIOInputs inputs) {}

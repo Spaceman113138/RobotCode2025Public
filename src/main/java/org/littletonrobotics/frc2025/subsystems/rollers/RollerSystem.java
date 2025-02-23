@@ -11,6 +11,7 @@ import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
 
@@ -32,7 +33,10 @@ public class RollerSystem extends SubsystemBase {
   public void periodic() {
     io.updateInputs(inputs);
     Logger.processInputs(name, inputs);
-    disconnected.set(!inputs.connected);
+    disconnected.set(!inputs.data.connected());
+
+    // Record cycle time
+    LoggedTracer.record(name);
   }
 
   @AutoLogOutput

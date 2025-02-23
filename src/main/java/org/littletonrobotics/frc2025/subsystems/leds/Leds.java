@@ -18,6 +18,7 @@ import edu.wpi.first.wpilibj.util.Color;
 import java.util.List;
 import java.util.Optional;
 import org.littletonrobotics.frc2025.FieldConstants.ReefLevel;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 
 public class Leds extends VirtualSubsystem {
@@ -61,7 +62,7 @@ public class Leds extends VirtualSubsystem {
   // Constants
   private static final boolean prideLeds = false;
   private static final int minLoopCycleCount = 10;
-  private static final int length = 20;
+  private static final int length = 32;
   private static final Section fullSection = new Section(0, length);
   private static final Section topSection = new Section(length / 2, length);
   private static final Section bottomSection = new Section(0, length / 2);
@@ -79,13 +80,13 @@ public class Leds extends VirtualSubsystem {
   private static final double waveDisabledDuration = 2.0;
   private static final double autoFadeTime = 2.5; // 3s nominal
   private static final double autoFadeMaxTime = 5.0; // Return to normal
-  private static final Color l1PriorityColor = Color.kYellow;
-  private static final Color l2PriorityColor = Color.kLime;
-  private static final Color l3PriorityColor = Color.kCyan;
-  private static final Color l4PriorityColor = Color.kMediumPurple;
+  private static final Color l1PriorityColor = Color.kOrangeRed;
+  private static final Color l2PriorityColor = Color.kGreen;
+  private static final Color l3PriorityColor = Color.kBlue;
+  private static final Color l4PriorityColor = Color.kPurple;
 
   private Leds() {
-    leds = new AddressableLED(0);
+    leds = new AddressableLED(9);
     buffer = new AddressableLEDBuffer(length);
     leds.setLength(length);
     leds.setData(buffer);
@@ -210,7 +211,7 @@ public class Leds extends VirtualSubsystem {
               return breath(
                   section,
                   primaryColor,
-                  Color.lerpRGB(primaryColor, Color.kBlack, 0.5),
+                  Color.lerpRGB(primaryColor, Color.kBlack, 0.9),
                   breathFastDuration);
             }
           };
@@ -256,6 +257,9 @@ public class Leds extends VirtualSubsystem {
 
     // Update LEDs
     leds.setData(buffer);
+
+    // Record cycle time
+    LoggedTracer.record("LEDs");
   }
 
   private Color solid(Section section, Color color) {

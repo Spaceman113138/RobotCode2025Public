@@ -25,6 +25,7 @@ import edu.wpi.first.units.measure.AngularVelocity;
 import edu.wpi.first.units.measure.Current;
 import edu.wpi.first.units.measure.Temperature;
 import edu.wpi.first.units.measure.Voltage;
+import org.littletonrobotics.frc2025.util.PhoenixUtil;
 
 /** Generic roller IO implementation for a roller or series of rollers using a Kraken. */
 public class RollerSystemIOTalonFX implements RollerSystemIO {
@@ -78,21 +79,30 @@ public class RollerSystemIOTalonFX implements RollerSystemIO {
                 torqueCurrent,
                 tempCelsius));
     tryUntilOk(5, () -> talon.optimizeBusUtilization(0, 1.0));
+
+    // Register signals for refresh
+    PhoenixUtil.registerSignals(
+        position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, tempCelsius);
   }
 
   @Override
   public void updateInputs(RollerSystemIOInputs inputs) {
-    inputs.connected =
-        connectedDebouncer.calculate(
-            BaseStatusSignal.refreshAll(
-                    position, velocity, appliedVoltage, supplyCurrent, torqueCurrent, tempCelsius)
-                .isOK());
-    inputs.positionRads = Units.rotationsToRadians(position.getValueAsDouble()) / reduction;
-    inputs.velocityRadsPerSec = Units.rotationsToRadians(velocity.getValueAsDouble()) / reduction;
-    inputs.appliedVoltage = appliedVoltage.getValueAsDouble();
-    inputs.supplyCurrentAmps = supplyCurrent.getValueAsDouble();
-    inputs.torqueCurrentAmps = torqueCurrent.getValueAsDouble();
-    inputs.tempCelsius = tempCelsius.getValueAsDouble();
+    inputs.data =
+        new RollerSystemIOData(
+            Units.rotationsToRadians(position.getValueAsDouble()) / reduction,
+            Units.rotationsToRadians(velocity.getValueAsDouble()) / reduction,
+            appliedVoltage.getValueAsDouble(),
+            supplyCurrent.getValueAsDouble(),
+            torqueCurrent.getValueAsDouble(),
+            tempCelsius.getValueAsDouble(),
+            connectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    position,
+                    velocity,
+                    appliedVoltage,
+                    supplyCurrent,
+                    torqueCurrent,
+                    tempCelsius)));
   }
 
   @Override

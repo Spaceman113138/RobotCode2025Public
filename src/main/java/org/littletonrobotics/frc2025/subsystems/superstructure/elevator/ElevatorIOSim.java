@@ -67,10 +67,20 @@ public class ElevatorIOSim implements ElevatorIO {
       }
     }
 
-    inputs.positionRad = simState.get(0) / Elevator.drumRadius;
-    inputs.velocityRadPerSec = simState.get(1) / Elevator.drumRadius;
-    inputs.appliedVolts = new double[] {appliedVolts};
-    inputs.torqueCurrentAmps = new double[] {Math.copySign(inputTorqueCurrent, appliedVolts)};
+    inputs.data =
+        new ElevatorIOData(
+            true,
+            true,
+            simState.get(0) / Elevator.drumRadius,
+            simState.get(1) / Elevator.drumRadius,
+            appliedVolts,
+            Math.copySign(inputTorqueCurrent, appliedVolts),
+            Math.copySign(inputTorqueCurrent, appliedVolts),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0);
   }
 
   @Override

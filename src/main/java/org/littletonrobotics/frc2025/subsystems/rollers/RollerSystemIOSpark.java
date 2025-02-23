@@ -66,14 +66,19 @@ public class RollerSystemIOSpark implements RollerSystemIO {
   @Override
   public void updateInputs(RollerSystemIOInputs inputs) {
     sparkStickyFault = false;
-    ifOk(spark, encoder::getPosition, position -> inputs.positionRads = position);
-    ifOk(spark, encoder::getVelocity, velocity -> inputs.velocityRadsPerSec = velocity);
-    ifOk(
-        spark,
-        new DoubleSupplier[] {spark::getBusVoltage, spark::getAppliedOutput},
-        x -> inputs.appliedVoltage = x[0] * x[1]);
-    ifOk(spark, spark::getOutputCurrent, current -> inputs.torqueCurrentAmps = current);
-    inputs.connected = connectedDebouncer.calculate(!sparkStickyFault);
+    inputs.data =
+        new RollerSystemIOData(
+            ifOkOrDefault(spark, encoder::getPosition, inputs.data.positionRads()),
+            ifOkOrDefault(spark, encoder::getVelocity, inputs.data.velocityRadsPerSec()),
+            ifOkOrDefault(
+                spark,
+                new DoubleSupplier[] {spark::getBusVoltage, spark::getAppliedOutput},
+                x -> x[0] * x[1],
+                inputs.data.appliedVoltage()),
+            0.0,
+            ifOkOrDefault(spark, spark::getOutputCurrent, inputs.data.torqueCurrentAmps()),
+            ifOkOrDefault(spark, spark::getMotorTemperature, inputs.data.tempCelsius()),
+            connectedDebouncer.calculate(!sparkStickyFault));
   }
 
   @Override

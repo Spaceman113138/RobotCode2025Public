@@ -23,6 +23,7 @@ import org.littletonrobotics.frc2025.RobotState.AlgaeTxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.TxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.VisionObservation;
 import org.littletonrobotics.frc2025.util.GeomUtil;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.Logger;
 import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
@@ -39,9 +40,6 @@ public class Vision extends VirtualSubsystem {
 
   private final Map<Integer, Double> lastFrameTimes = new HashMap<>();
   private final Map<Integer, Double> lastTagDetectionTimes = new HashMap<>();
-
-  private Pose3d demoTagPose = null;
-  private double lastDemoTagPoseTimestamp = 0.0;
 
   public Vision(Supplier<AprilTagLayoutType> aprilTagLayoutSupplier, VisionIO... io) {
     this.aprilTagLayoutSupplier = aprilTagLayoutSupplier;
@@ -76,7 +74,6 @@ public class Vision extends VirtualSubsystem {
 
     // Loop over instances
     List<Pose2d> allRobotPoses = new ArrayList<>();
-    List<Pose3d> allRobotPoses3d = new ArrayList<>();
     List<VisionObservation> allVisionObservations = new ArrayList<>();
     Map<Integer, TxTyObservation> allTxTyObservations = new HashMap<>();
     List<AlgaeTxTyObservation> allAlgaeTxTyObservations = new ArrayList<>();
@@ -97,7 +94,7 @@ public class Vision extends VirtualSubsystem {
 
         // Switch based on number of poses
         Pose3d cameraPose = null;
-        Pose3d robotPose3d = null;
+        Pose2d robotPose = null;
         boolean useVisionRotation = false;
         switch ((int) values[0]) {
           case 1:
@@ -108,9 +105,11 @@ public class Vision extends VirtualSubsystem {
                     values[3],
                     values[4],
                     new Rotation3d(new Quaternion(values[5], values[6], values[7], values[8])));
-            robotPose3d =
-                cameraPose.transformBy(
-                    cameras[instanceIndex].pose().get().toTransform3d().inverse());
+            robotPose =
+                cameraPose
+                    .toPose2d()
+                    .transformBy(
+                        cameras[instanceIndex].pose().get().toPose2d().toTransform2d().inverse());
             useVisionRotation = true;
             break;
           case 2:
@@ -129,45 +128,40 @@ public class Vision extends VirtualSubsystem {
                     values[11],
                     values[12],
                     new Rotation3d(new Quaternion(values[13], values[14], values[15], values[16])));
-            Transform3d cameraToRobot =
-                cameras[instanceIndex].pose().get().toTransform3d().inverse();
-            Pose3d robotPose3d0 = cameraPose0.transformBy(cameraToRobot);
-            Pose3d robotPose3d1 = cameraPose1.transformBy(cameraToRobot);
+            Transform2d cameraToRobot =
+                cameras[instanceIndex].pose().get().toPose2d().toTransform2d().inverse();
+            Pose2d robotPose0 = cameraPose0.toPose2d().transformBy(cameraToRobot);
+            Pose2d robotPose1 = cameraPose1.toPose2d().transformBy(cameraToRobot);
 
             // Check for ambiguity and select based on estimated rotation
             if (error0 < error1 * ambiguityThreshold || error1 < error0 * ambiguityThreshold) {
               Rotation2d currentRotation = RobotState.getInstance().getRotation();
-              Rotation2d visionRotation0 = robotPose3d0.toPose2d().getRotation();
-              Rotation2d visionRotation1 = robotPose3d1.toPose2d().getRotation();
+              Rotation2d visionRotation0 = robotPose0.getRotation();
+              Rotation2d visionRotation1 = robotPose1.getRotation();
               if (Math.abs(currentRotation.minus(visionRotation0).getRadians())
                   < Math.abs(currentRotation.minus(visionRotation1).getRadians())) {
                 cameraPose = cameraPose0;
-                robotPose3d = robotPose3d0;
+                robotPose = robotPose0;
               } else {
                 cameraPose = cameraPose1;
-                robotPose3d = robotPose3d1;
+                robotPose = robotPose1;
               }
             }
             break;
         }
 
         // Exit if no data
-        if (cameraPose == null || robotPose3d == null) {
+        if (cameraPose == null || robotPose == null) {
           continue;
         }
 
         // Exit if robot pose is off the field
-        if (robotPose3d.getX() < -fieldBorderMargin
-            || robotPose3d.getX() > FieldConstants.fieldLength + fieldBorderMargin
-            || robotPose3d.getY() < -fieldBorderMargin
-            || robotPose3d.getY() > FieldConstants.fieldWidth + fieldBorderMargin
-            || robotPose3d.getZ() < -zMargin
-            || robotPose3d.getZ() > zMargin) {
+        if (robotPose.getX() < -fieldBorderMargin
+            || robotPose.getX() > FieldConstants.fieldLength + fieldBorderMargin
+            || robotPose.getY() < -fieldBorderMargin
+            || robotPose.getY() > FieldConstants.fieldWidth + fieldBorderMargin) {
           continue;
         }
-
-        // Get 2D robot pose
-        Pose2d robotPose = robotPose3d.toPose2d();
 
         // Get tag poses and update last detection times
         List<Pose3d> tagPoses = new ArrayList<>();
@@ -204,16 +198,16 @@ public class Vision extends VirtualSubsystem {
             new VisionObservation(
                 robotPose, timestamp, VecBuilder.fill(xyStdDev, xyStdDev, thetaStdDev)));
         allRobotPoses.add(robotPose);
-        allRobotPoses3d.add(robotPose3d);
 
         // Log data from instance
-        Logger.recordOutput(
-            "AprilTagVision/Inst" + instanceIndex + "/LatencySecs",
-            Timer.getTimestamp() - timestamp);
-        Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose", robotPose);
-        Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose3d", robotPose3d);
-        Logger.recordOutput(
-            "AprilTagVision/Inst" + instanceIndex + "/TagPoses", tagPoses.toArray(Pose3d[]::new));
+        if (enableInstanceLogging) {
+          Logger.recordOutput(
+              "AprilTagVision/Inst" + instanceIndex + "/LatencySecs",
+              Timer.getTimestamp() - timestamp);
+          Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose", robotPose);
+          Logger.recordOutput(
+              "AprilTagVision/Inst" + instanceIndex + "/TagPoses", tagPoses.toArray(Pose3d[]::new));
+        }
       }
 
       // Get tag tx ty observation data
@@ -273,121 +267,44 @@ public class Vision extends VirtualSubsystem {
         }
       }
 
-      // Record demo tag pose
-      if (aprilTagInputs[instanceIndex].demoFrame.length > 0) {
-        var values = aprilTagInputs[instanceIndex].demoFrame;
-        double error0 = values[0];
-        double error1 = values[8];
-        Pose3d fieldToCameraPose =
-            new Pose3d(RobotState.getInstance().getEstimatedPose())
-                .transformBy(cameras[instanceIndex].pose().get().toTransform3d());
-        Pose3d fieldToTagPose0 =
-            fieldToCameraPose.transformBy(
-                new Transform3d(
-                    new Translation3d(values[1], values[2], values[3]),
-                    new Rotation3d(new Quaternion(values[4], values[5], values[6], values[7]))));
-        Pose3d fieldToTagPose1 =
-            fieldToCameraPose.transformBy(
-                new Transform3d(
-                    new Translation3d(values[9], values[10], values[11]),
-                    new Rotation3d(
-                        new Quaternion(values[12], values[13], values[14], values[15]))));
-        Pose3d fieldToTagPose;
-
-        // Find best pose
-        if (demoTagPose == null && error0 < error1) {
-          fieldToTagPose = fieldToTagPose0;
-        } else if (demoTagPose == null && error0 >= error1) {
-          fieldToTagPose = fieldToTagPose1;
-        } else if (error0 < error1 * ambiguityThreshold) {
-          fieldToTagPose = fieldToTagPose0;
-        } else if (error1 < error0 * ambiguityThreshold) {
-          fieldToTagPose = fieldToTagPose1;
-        } else {
-          var pose0Quaternion = fieldToTagPose0.getRotation().getQuaternion();
-          var pose1Quaternion = fieldToTagPose1.getRotation().getQuaternion();
-          var referenceQuaternion = demoTagPose.getRotation().getQuaternion();
-          double pose0Distance =
-              Math.acos(
-                  pose0Quaternion.getW() * referenceQuaternion.getW()
-                      + pose0Quaternion.getX() * referenceQuaternion.getX()
-                      + pose0Quaternion.getY() * referenceQuaternion.getY()
-                      + pose0Quaternion.getZ() * referenceQuaternion.getZ());
-          double pose1Distance =
-              Math.acos(
-                  pose1Quaternion.getW() * referenceQuaternion.getW()
-                      + pose1Quaternion.getX() * referenceQuaternion.getX()
-                      + pose1Quaternion.getY() * referenceQuaternion.getY()
-                      + pose1Quaternion.getZ() * referenceQuaternion.getZ());
-          if (pose0Distance > Math.PI / 2) {
-            pose0Distance = Math.PI - pose0Distance;
-          }
-          if (pose1Distance > Math.PI / 2) {
-            pose1Distance = Math.PI - pose1Distance;
-          }
-          if (pose0Distance < pose1Distance) {
-            fieldToTagPose = fieldToTagPose0;
-          } else {
-            fieldToTagPose = fieldToTagPose1;
-          }
-        }
-
-        // Save pose
-        if (fieldToTagPose != null) {
-          demoTagPose = fieldToTagPose;
-          lastDemoTagPoseTimestamp = Timer.getTimestamp();
-        }
-
-        // If no frames from instances, clear robot pose
-        if (aprilTagInputs[instanceIndex].timestamps.length == 0) {
-          Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose", new Pose2d());
-          Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose3d", new Pose3d());
-        }
-
-        // If no recent frames from instance, clear tag poses
-        if (Timer.getTimestamp() - lastFrameTimes.get(instanceIndex) > targetLogTimeSecs) {
-          Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/TagPoses", new Pose3d[] {});
-        }
+      // If no frames from instances, clear robot pose
+      if (enableInstanceLogging && aprilTagInputs[instanceIndex].timestamps.length == 0) {
+        Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/RobotPose", new Pose2d());
       }
 
-      // Clear demo tag pose
-      if (Timer.getTimestamp() - lastDemoTagPoseTimestamp > demoTagPosePersistenceSecs) {
-        demoTagPose = null;
+      // If no recent frames from instance, clear tag poses
+      if (enableInstanceLogging
+          && Timer.getTimestamp() - lastFrameTimes.get(instanceIndex) > targetLogTimeSecs) {
+        Logger.recordOutput("AprilTagVision/Inst" + instanceIndex + "/TagPoses", new Pose3d[] {});
       }
-
-      // Log robot poses
-      Logger.recordOutput("AprilTagVision/RobotPoses", allRobotPoses.toArray(Pose2d[]::new));
-      Logger.recordOutput("AprilTagVision/RobotPoses3d", allRobotPoses3d.toArray(Pose3d[]::new));
-
-      // Log tag poses
-      List<Pose3d> allTagPoses = new ArrayList<>();
-      for (Map.Entry<Integer, Double> detectionEntry : lastTagDetectionTimes.entrySet()) {
-        if (Timer.getTimestamp() - detectionEntry.getValue() < targetLogTimeSecs) {
-          aprilTagLayoutSupplier
-              .get()
-              .getLayout()
-              .getTagPose(detectionEntry.getKey())
-              .ifPresent(allTagPoses::add);
-        }
-      }
-      Logger.recordOutput("AprilTagVision/TagPoses", allTagPoses.toArray(Pose3d[]::new));
-
-      // Log demo tag pose
-      if (demoTagPose == null) {
-        Logger.recordOutput("AprilTagVision/DemoTagPose", new Pose3d[] {});
-      } else {
-        Logger.recordOutput("AprilTagVision/DemoTagPose", demoTagPose);
-      }
-      Logger.recordOutput("AprilTagVision/DemoTagPoseId", new long[] {29});
-
-      // Send results to robot state
-      allVisionObservations.stream()
-          .sorted(Comparator.comparingDouble(VisionObservation::timestamp))
-          .forEach(RobotState.getInstance()::addVisionObservation);
-      allTxTyObservations.values().stream().forEach(RobotState.getInstance()::addTxTyObservation);
-      allAlgaeTxTyObservations.stream()
-          .sorted(Comparator.comparingDouble(AlgaeTxTyObservation::timestamp))
-          .forEach(RobotState.getInstance()::addAlgaeTxTyObservation);
     }
+
+    // Log robot poses
+    Logger.recordOutput("AprilTagVision/RobotPoses", allRobotPoses.toArray(Pose2d[]::new));
+
+    // Log tag poses
+    List<Pose3d> allTagPoses = new ArrayList<>();
+    for (Map.Entry<Integer, Double> detectionEntry : lastTagDetectionTimes.entrySet()) {
+      if (Timer.getTimestamp() - detectionEntry.getValue() < targetLogTimeSecs) {
+        aprilTagLayoutSupplier
+            .get()
+            .getLayout()
+            .getTagPose(detectionEntry.getKey())
+            .ifPresent(allTagPoses::add);
+      }
+    }
+    Logger.recordOutput("AprilTagVision/TagPoses", allTagPoses.toArray(Pose3d[]::new));
+
+    // Send results to robot state
+    allVisionObservations.stream()
+        .sorted(Comparator.comparingDouble(VisionObservation::timestamp))
+        .forEach(RobotState.getInstance()::addVisionObservation);
+    allTxTyObservations.values().stream().forEach(RobotState.getInstance()::addTxTyObservation);
+    allAlgaeTxTyObservations.stream()
+        .sorted(Comparator.comparingDouble(AlgaeTxTyObservation::timestamp))
+        .forEach(RobotState.getInstance()::addAlgaeTxTyObservation);
+
+    // Record cycle time
+    LoggedTracer.record("Vision");
   }
 }

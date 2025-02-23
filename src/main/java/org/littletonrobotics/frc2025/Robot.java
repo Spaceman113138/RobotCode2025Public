@@ -26,6 +26,9 @@ import java.util.function.BiConsumer;
 import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.util.CanivoreReader;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
+import org.littletonrobotics.frc2025.util.PhoenixUtil;
+import org.littletonrobotics.frc2025.util.SystemTimeValidReader;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.frc2025.util.rlog.RLOGServer;
 import org.littletonrobotics.junction.AutoLogOutputManager;
@@ -129,6 +132,9 @@ public class Robot extends LoggedRobot {
       DriverStation.reportWarning("Failed to disable loop overrun warnings.", false);
     }
 
+    // Start system time valid reader
+    SystemTimeValidReader.start();
+
     // Rely on our custom alerts for disconnected controllers
     DriverStation.silenceJoystickConnectionWarning(true);
 
@@ -169,17 +175,23 @@ public class Robot extends LoggedRobot {
     robotContainer = new RobotContainer();
 
     // Switch thread to high priority to improve loop timing
-    Threads.setCurrentThreadPriority(true, 5);
+    Threads.setCurrentThreadPriority(true, 10);
   }
 
   /** This function is called periodically during all modes. */
   @Override
   public void robotPeriodic() {
+    // Refresh all Phoenix signals
+    LoggedTracer.reset();
+    PhoenixUtil.refreshAll();
+    LoggedTracer.record("PhoenixRefresh");
+
     // Run virtual subsystems
     VirtualSubsystem.periodicAll();
 
     // Run command scheduler
     CommandScheduler.getInstance().run();
+    LoggedTracer.record("Commands");
 
     // Print auto duration
     if (autonomousCommand != null) {
@@ -246,6 +258,9 @@ public class Robot extends LoggedRobot {
 
     // Log robot state values
     RobotState.getInstance().periodicLog();
+
+    // Record cycle time
+    LoggedTracer.record("RobotPeriodic");
   }
 
   /** This function is called once when the robot is disabled. */

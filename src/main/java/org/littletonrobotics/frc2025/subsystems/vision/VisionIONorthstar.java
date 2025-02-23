@@ -12,18 +12,17 @@ import static org.littletonrobotics.frc2025.subsystems.vision.VisionConstants.*;
 import edu.wpi.first.networktables.*;
 import edu.wpi.first.util.WPIUtilJNI;
 import edu.wpi.first.wpilibj.Alert;
-import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.function.Supplier;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
+import org.littletonrobotics.frc2025.util.SystemTimeValidReader;
 
 public class VisionIONorthstar implements VisionIO {
   private final Supplier<AprilTagLayoutType> aprilTagLayoutSupplier;
   private AprilTagLayoutType lastAprilTagLayout = null;
 
   private final DoubleArraySubscriber observationSubscriber;
-  private final DoubleArraySubscriber demoObservationSubscriber;
   private final DoubleArraySubscriber objDetectObservationSubscriber;
   private final IntegerSubscriber fpsAprilTagsSubscriber;
   private final IntegerSubscriber fpsObjDetectSubscriber;
@@ -31,6 +30,7 @@ public class VisionIONorthstar implements VisionIO {
   private final BooleanPublisher isRecordingPublisher;
   private final StringPublisher tagLayoutPublisher;
 
+  private final Timer slowPeriodicTimer = new Timer();
   private static final double disconnectedTimeout = 0.5;
   private final Alert disconnectedAlert;
   private final Timer disconnectedTimer = new Timer();
@@ -61,14 +61,6 @@ public class VisionIONorthstar implements VisionIO {
                 PubSubOption.keepDuplicates(true),
                 PubSubOption.sendAll(true),
                 PubSubOption.periodic(0.01));
-    demoObservationSubscriber =
-        outputTable
-            .getDoubleArrayTopic("demo_observations")
-            .subscribe(
-                new double[] {},
-                PubSubOption.keepDuplicates(true),
-                PubSubOption.sendAll(true),
-                PubSubOption.periodic(0.01));
     objDetectObservationSubscriber =
         outputTable
             .getDoubleArrayTopic("objdetect_observations")
@@ -80,6 +72,7 @@ public class VisionIONorthstar implements VisionIO {
     fpsAprilTagsSubscriber = outputTable.getIntegerTopic("fps_apriltags").subscribe(0);
     fpsObjDetectSubscriber = outputTable.getIntegerTopic("fps_objdetect").subscribe(0);
 
+    slowPeriodicTimer.start();
     disconnectedAlert =
         new Alert("No data from \"northstar_" + index + "\"", Alert.AlertType.kError);
     disconnectedTimer.start();
@@ -87,8 +80,10 @@ public class VisionIONorthstar implements VisionIO {
 
   public void updateInputs(
       AprilTagVisionIOInputs aprilTagInputs, ObjDetectVisionIOInputs objDetectInputs) {
+    boolean slowPeriodic = slowPeriodicTimer.advanceIfElapsed(1.0);
+
     // Publish timestamp
-    if (RobotController.isSystemTimeValid()) {
+    if (slowPeriodic && SystemTimeValidReader.isValid()) {
       timestampPublisher.set(WPIUtilJNI.getSystemTime() / 1000000);
     }
 
@@ -107,11 +102,9 @@ public class VisionIONorthstar implements VisionIO {
       aprilTagInputs.timestamps[i] = aprilTagQueue[i].timestamp / 1000000.0;
       aprilTagInputs.frames[i] = aprilTagQueue[i].value;
     }
-    aprilTagInputs.demoFrame = new double[] {};
-    for (double[] demoFrame : demoObservationSubscriber.readQueueValues()) {
-      aprilTagInputs.demoFrame = demoFrame;
+    if (slowPeriodic) {
+      aprilTagInputs.fps = fpsAprilTagsSubscriber.get();
     }
-    aprilTagInputs.fps = fpsAprilTagsSubscriber.get();
 
     // Get object detection data
     var objDetectQueue = objDetectObservationSubscriber.readQueue();
@@ -121,7 +114,9 @@ public class VisionIONorthstar implements VisionIO {
       objDetectInputs.timestamps[i] = objDetectQueue[i].timestamp / 1000000.0;
       objDetectInputs.frames[i] = objDetectQueue[i].value;
     }
-    objDetectInputs.fps = fpsObjDetectSubscriber.get();
+    if (slowPeriodic) {
+      objDetectInputs.fps = fpsObjDetectSubscriber.get();
+    }
 
     // Update disconnected alert
     if (aprilTagQueue.length > 0 || objDetectQueue.length > 0) {

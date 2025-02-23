@@ -11,6 +11,6 @@ import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevatorIOKrakenFOC;
 
 public class ChariotIOTalonFX extends GenericSlamElevatorIOKrakenFOC implements ChariotIO {
   public ChariotIOTalonFX() {
-    super(0, "*", 60, false, 4.0);
+    super(8, "*", 60, false, 4.0);
   }
 }

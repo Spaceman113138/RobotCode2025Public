@@ -12,6 +12,7 @@ import com.revrobotics.spark.SparkBase;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class SparkUtil {
@@ -40,6 +41,37 @@ public class SparkUtil {
       }
     }
     consumer.accept(values);
+  }
+
+  /** Return a value from a Spark (or the default if the value is invalid). */
+  public static double ifOkOrDefault(
+      SparkBase spark, DoubleSupplier supplier, double defaultValue) {
+    double value = supplier.getAsDouble();
+    if (spark.getLastError() == REVLibError.kOk) {
+      return value;
+    } else {
+      sparkStickyFault = true;
+      return defaultValue;
+    }
+  }
+
+  /**
+   * Return a processed set of values from a Spark (or the default if one of the values is invalid).
+   */
+  public static double ifOkOrDefault(
+      SparkBase spark,
+      DoubleSupplier[] suppliers,
+      Function<Double[], Double> transformer,
+      double defaultValue) {
+    Double[] values = new Double[suppliers.length];
+    for (int i = 0; i < suppliers.length; i++) {
+      values[i] = suppliers[i].getAsDouble();
+      if (spark.getLastError() != REVLibError.kOk) {
+        sparkStickyFault = true;
+        return defaultValue;
+      }
+    }
+    return transformer.apply(values);
   }
 
   /** Attempts to run the command until no error is produced. */

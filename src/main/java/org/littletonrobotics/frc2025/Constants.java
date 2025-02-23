@@ -14,7 +14,7 @@ import edu.wpi.first.wpilibj.RobotBase;
 /** This class contains global configuration describing the current robot and runtime mode. */
 public final class Constants {
   public static final double loopPeriodSecs = 0.02;
-  private static RobotType robotType = RobotType.DEVBOT;
+  private static RobotType robotType = RobotType.COMPBOT;
   public static final boolean tuningMode = false;
 
   @SuppressWarnings("resource")
@@ -70,7 +70,7 @@ public final class Constants {
   /** Checks that the default robot is selected and tuning mode is disabled. */
   public static class CheckPullRequest {
     public static void main(String... args) {
-      if (robotType != RobotType.DEVBOT || tuningMode) {
+      if (robotType != RobotType.COMPBOT || tuningMode) {
         System.err.println("Do not merge, non-default constants are configured.");
         System.exit(1);
       }

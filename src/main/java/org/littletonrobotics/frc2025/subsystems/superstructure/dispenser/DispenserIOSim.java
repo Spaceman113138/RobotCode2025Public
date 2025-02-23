@@ -64,10 +64,18 @@ public class DispenserIOSim implements DispenserIO {
       }
     }
     // Pivot
-    inputs.internalPosition = Rotation2d.fromRadians(simState.get(0));
-    inputs.velocityRadPerSec = simState.get(1);
-    inputs.appliedVolts = pivotAppliedVolts;
-    inputs.torqueCurrentAmps = inputTorqueCurrent;
+    inputs.data =
+        new DispenserIOData(
+            true,
+            true,
+            Rotation2d.fromRadians(simState.get(0)),
+            Rotation2d.fromRadians(simState.get(0)),
+            simState.get(0),
+            simState.get(1),
+            pivotAppliedVolts,
+            0.0,
+            inputTorqueCurrent,
+            0.0);
   }
 
   @Override

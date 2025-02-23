@@ -31,14 +31,16 @@ public class RollerSystemIOSim implements RollerSystemIO {
       runVolts(0.0);
     }
 
-    inputs.connected = true;
     sim.update(Constants.loopPeriodSecs);
-    inputs.positionRads = sim.getAngularPositionRad();
-    inputs.velocityRadsPerSec = sim.getAngularVelocityRadPerSec();
-    inputs.appliedVoltage = appliedVoltage;
-    inputs.supplyCurrentAmps = sim.getCurrentDrawAmps();
-    inputs.torqueCurrentAmps =
-        gearbox.getCurrent(sim.getAngularVelocityRadPerSec(), appliedVoltage);
+    inputs.data =
+        new RollerSystemIOData(
+            sim.getAngularPositionRad(),
+            sim.getAngularVelocityRadPerSec(),
+            appliedVoltage,
+            sim.getCurrentDrawAmps(),
+            gearbox.getCurrent(sim.getAngularVelocityRadPerSec(), appliedVoltage),
+            0.0,
+            true);
   }
 
   @Override

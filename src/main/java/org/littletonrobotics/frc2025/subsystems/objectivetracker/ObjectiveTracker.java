@@ -32,6 +32,7 @@ import org.littletonrobotics.frc2025.commands.AutoScore;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.GeomUtil;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -408,6 +409,9 @@ public class ObjectiveTracker extends VirtualSubsystem {
         () ->
             Logger.recordOutput(
                 "ObjectiveTracker/Strategy/AlgaeObjective", new AlgaeObjective[] {}));
+
+    // Record cycle time
+    LoggedTracer.record("ObjectiveTracker");
   }
 
   public Command requestScored(Supplier<CoralObjective> coralObjective) {

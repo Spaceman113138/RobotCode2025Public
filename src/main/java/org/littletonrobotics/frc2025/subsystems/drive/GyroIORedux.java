@@ -39,9 +39,11 @@ public class GyroIORedux implements GyroIO {
 
   @Override
   public void updateInputs(GyroIOInputs inputs) {
-    inputs.connected = connectedDebouncer.calculate(gyro.isConnected());
-    inputs.yawPosition = Rotation2d.fromRotations(gyro.getYaw());
-    inputs.yawVelocityRadPerSec = Units.rotationsToRadians(gyro.getAngularVelocityYaw());
+    inputs.data =
+        new GyroIOData(
+            connectedDebouncer.calculate(gyro.isConnected()),
+            Rotation2d.fromRotations(gyro.getYaw()),
+            Units.rotationsToRadians(gyro.getAngularVelocityYaw()));
 
     inputs.odometryYawTimestamps =
         yawTimestampQueue.stream().mapToDouble((Double value) -> value).toArray();

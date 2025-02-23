@@ -13,13 +13,17 @@ import edu.wpi.first.math.util.Units;
 import java.util.function.Supplier;
 import lombok.Builder;
 import org.littletonrobotics.frc2025.Constants;
+import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public class VisionConstants {
+  private static final boolean forceEnableInstanceLogging = false;
+  public static final boolean enableInstanceLogging =
+      forceEnableInstanceLogging || Constants.getMode() == Mode.REPLAY;
+
   public static final double ambiguityThreshold = 0.4;
   public static final double targetLogTimeSecs = 0.1;
   public static final double fieldBorderMargin = 0.5;
-  public static final double zMargin = 0.75;
   public static final double xyStdDevCoefficient = 0.015;
   public static final double thetaStdDevCoefficient = 0.03;
   public static final double demoTagPosePersistenceSecs = 0.5;

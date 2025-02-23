@@ -13,18 +13,21 @@ import org.littletonrobotics.junction.AutoLog;
 public interface DispenserIO {
   @AutoLog
   class DispenserIOInputs {
-    public boolean motorConnected = true;
-    public boolean encoderConnected = false;
-
-    public Rotation2d internalPosition = new Rotation2d();
-    public Rotation2d encoderAbsolutePosition = new Rotation2d();
-    public double encoderRelativePosition = 0.0;
-    public double velocityRadPerSec = 0.0;
-    public double appliedVolts = 0.0;
-    public double supplyCurrentAmps = 0.0;
-    public double torqueCurrentAmps = 0.0;
-    public double tempCelsius = 0.0;
+    public DispenserIOData data =
+        new DispenserIOData(false, false, Rotation2d.kZero, Rotation2d.kZero, 0, 0, 0, 0, 0, 0);
   }
+
+  record DispenserIOData(
+      boolean motorConnected,
+      boolean encoderConnected,
+      Rotation2d internalPosition,
+      Rotation2d encoderAbsolutePosition,
+      double encoderRelativePosition,
+      double velocityRadPerSec,
+      double appliedVolts,
+      double supplyCurrentAmps,
+      double torqueCurrentAmps,
+      double tempCelsius) {}
 
   default void updateInputs(DispenserIOInputs inputs) {}
 

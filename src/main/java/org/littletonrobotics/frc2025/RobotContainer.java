@@ -37,13 +37,11 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystem;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSpark;
-import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIO;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIOSim;
-import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.*;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.ElevatorIO;
@@ -112,22 +110,23 @@ public class RobotContainer {
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[1]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[2]),
                   new ModuleIOComp(DriveConstants.moduleConfigsComp[3]));
-          vision =
-              new Vision(
-                  this::getSelectedAprilTagLayout,
-                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 0),
-                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 1),
-                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 2),
-                  new VisionIONorthstar(this::getSelectedAprilTagLayout, 3));
-          elevator = new Elevator(new ElevatorIOTalonFX());
-          dispenser =
-              new Dispenser(
-                  new DispenserIOTalonFX(),
-                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
-                  new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
-          chariot =
-              new Chariot(
-                  new ChariotIOTalonFX(), new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
+          // vision =
+          //     new Vision(
+          //         this::getSelectedAprilTagLayout,
+          //         new VisionIONorthstar(this::getSelectedAprilTagLayout, 0),
+          //         new VisionIONorthstar(this::getSelectedAprilTagLayout, 1),
+          //         new VisionIONorthstar(this::getSelectedAprilTagLayout, 2),
+          //         new VisionIONorthstar(this::getSelectedAprilTagLayout, 3));
+          // elevator = new Elevator(new ElevatorIOTalonFX());
+          // dispenser =
+          //     new Dispenser(
+          //         new DispenserIOTalonFX(),
+          //         new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0),
+          //         new RollerSystemIOTalonFX(0, "*", 0, false, false, 1.0));
+          // chariot =
+          //     new Chariot(
+          //         new ChariotIOTalonFX(), new RollerSystemIOTalonFX(12, "*", 0, false, false,
+          // 1.0));
         }
         case DEVBOT -> {
           drive =
@@ -146,7 +145,6 @@ public class RobotContainer {
           dispenser =
               new Dispenser(
                   new DispenserIO() {}, new RollerSystemIOSpark(5, true), new RollerSystemIO() {});
-          //   funnel = new RollerSystem("Funnel", new RollerSystemIOSpark(4, false));
         }
         case SIMBOT -> {
           drive =

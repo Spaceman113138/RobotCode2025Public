@@ -35,6 +35,7 @@ import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot.Goal;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -351,6 +352,9 @@ public class Superstructure extends SubsystemBase {
           case HALF_OUT -> Units.inchesToMeters(Chariot.halfOutPositionInches.get());
         },
         dispenser.hasAlgae());
+
+    // Record cycle time
+    LoggedTracer.record("Superstructure");
   }
 
   @AutoLogOutput(key = "Superstructure/AtGoal")

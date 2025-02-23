@@ -26,6 +26,7 @@ import org.littletonrobotics.junction.LogDataReceiver;
 import org.littletonrobotics.junction.LogTable;
 
 import edu.wpi.first.wpilibj.RobotController;
+import edu.wpi.first.wpilibj.Threads;
 
 /** Sends log data over a socket connection using the RLOG format. */
 public class RLOGServer implements LogDataReceiver {
@@ -47,6 +48,7 @@ public class RLOGServer implements LogDataReceiver {
   public void start() {
     thread = new ServerThread(port);
     thread.start();
+    Threads.setCurrentThreadPriority(true, 1);
     System.out.println("[AdvantageKit] RLOG server started on port " + Integer.toString(port));
   }
 

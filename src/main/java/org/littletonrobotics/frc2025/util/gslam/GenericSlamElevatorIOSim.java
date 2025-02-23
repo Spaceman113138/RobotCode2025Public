@@ -49,10 +49,15 @@ public class GenericSlamElevatorIOSim implements GenericSlamElevatorIO {
     }
 
     sim.update(Constants.loopPeriodSecs);
-    inputs.positionRads = sim.getPositionMeters() / drumRadius;
-    inputs.velocityRadsPerSec = sim.getVelocityMetersPerSecond();
-    inputs.appliedVoltage = appliedVoltage;
-    inputs.supplyCurrentAmps = Math.abs(sim.getCurrentDrawAmps());
+    inputs.data =
+        new GenericSlamElevatorIOData(
+            true,
+            sim.getPositionMeters() / drumRadius,
+            sim.getVelocityMetersPerSecond(),
+            appliedVoltage,
+            Math.abs(sim.getCurrentDrawAmps()),
+            Math.abs(sim.getCurrentDrawAmps()),
+            0.0);
   }
 
   @Override
