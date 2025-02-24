@@ -12,6 +12,7 @@ import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.IterativeRobotBase;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj.RobotController;
 import edu.wpi.first.wpilibj.Threads;
 import edu.wpi.first.wpilibj.Timer;
@@ -27,6 +28,7 @@ import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.util.CanivoreReader;
 import org.littletonrobotics.frc2025.util.LoggedTracer;
+import org.littletonrobotics.frc2025.util.NTClientLogger;
 import org.littletonrobotics.frc2025.util.PhoenixUtil;
 import org.littletonrobotics.frc2025.util.SystemTimeValidReader;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
@@ -35,6 +37,7 @@ import org.littletonrobotics.junction.AutoLogOutputManager;
 import org.littletonrobotics.junction.LogFileUtil;
 import org.littletonrobotics.junction.LoggedRobot;
 import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.inputs.LoggedPowerDistribution;
 import org.littletonrobotics.junction.wpilog.WPILOGReader;
 import org.littletonrobotics.junction.wpilog.WPILOGWriter;
 
@@ -100,6 +103,9 @@ public class Robot extends LoggedRobot {
         // Running on a real robot, log to a USB stick ("/U/logs")
         Logger.addDataReceiver(new WPILOGWriter());
         Logger.addDataReceiver(new RLOGServer());
+        if (Constants.getRobot() == RobotType.COMPBOT) {
+          LoggedPowerDistribution.getInstance(50, ModuleType.kRev);
+        }
         break;
 
       case SIM:
@@ -240,6 +246,9 @@ public class Robot extends LoggedRobot {
           !canivoreErrorTimer.hasElapsed(canivoreErrorTimeThreshold)
               && !canInitialErrorTimer.hasElapsed(canErrorTimeThreshold));
     }
+
+    // Log NT client list
+    NTClientLogger.log();
 
     // Low battery alert
     lowBatteryCycleCount += 1;

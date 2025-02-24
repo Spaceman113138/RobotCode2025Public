@@ -28,6 +28,10 @@ import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
 import org.littletonrobotics.frc2025.FieldConstants.ReefLevel;
 import org.littletonrobotics.frc2025.commands.*;
+import org.littletonrobotics.frc2025.subsystems.climber.Climber;
+import org.littletonrobotics.frc2025.subsystems.climber.ClimberIO;
+import org.littletonrobotics.frc2025.subsystems.climber.ClimberIOSim;
+import org.littletonrobotics.frc2025.subsystems.climber.ClimberIOTalonFX;
 import org.littletonrobotics.frc2025.subsystems.drive.*;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.subsystems.objectivetracker.ObjectiveTracker;
@@ -52,19 +56,21 @@ import org.littletonrobotics.frc2025.subsystems.vision.VisionIO;
 import org.littletonrobotics.frc2025.subsystems.vision.VisionIONorthstar;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.Container;
+import org.littletonrobotics.frc2025.util.DoublePressTracker;
 import org.littletonrobotics.frc2025.util.OverrideSwitches;
 import org.littletonrobotics.frc2025.util.TriggerUtil;
 import org.littletonrobotics.frc2025.util.trajectory.HolonomicTrajectory;
 import org.littletonrobotics.junction.networktables.LoggedDashboardChooser;
 import org.littletonrobotics.junction.networktables.LoggedNetworkNumber;
 
-@ExtensionMethod({TriggerUtil.class})
+@ExtensionMethod({DoublePressTracker.class, TriggerUtil.class})
 public class RobotContainer {
   // Subsystems
   private Drive drive;
   private Vision vision;
   private final Superstructure superstructure;
   private RollerSystem funnel;
+  private Climber climber;
   private ObjectiveTracker objectiveTracker;
   private final Leds leds = Leds.getInstance();
 
@@ -90,6 +96,7 @@ public class RobotContainer {
       new LoggedNetworkNumber("/SmartDashboard/Endgame Alert #2", 15.0);
 
   private boolean superstructureCoastOverride = false;
+  private boolean climberDeployed = false;
 
   // Dashboard inputs
   private final LoggedDashboardChooser<Command> autoChooser;
@@ -127,6 +134,10 @@ public class RobotContainer {
           //     new Chariot(
           //         new ChariotIOTalonFX(), new RollerSystemIOTalonFX(12, "*", 0, false, false,
           // 1.0));
+          // funnel =
+          //     new RollerSystem("Funnel", new RollerSystemIOTalonFX(2, "", 30, false, false,
+          // 1.0));
+          climber = new Climber(new ClimberIOTalonFX());
         }
         case DEVBOT -> {
           drive =
@@ -160,6 +171,7 @@ public class RobotContainer {
                   new DispenserIOSim(),
                   new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2),
                   new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.2));
+          climber = new Climber(new ClimberIOSim());
           chariot =
               new Chariot(
                   new ChariotIOSim(), new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
@@ -204,6 +216,9 @@ public class RobotContainer {
     if (funnel == null) {
       funnel = new RollerSystem("Funnel", new RollerSystemIO() {});
     }
+    if (climber == null) {
+      climber = new Climber(new ClimberIO() {});
+    }
     objectiveTracker =
         new ObjectiveTracker(
             Constants.getMode() == Mode.REPLAY
@@ -235,6 +250,7 @@ public class RobotContainer {
     elevator.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
     dispenser.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
     chariot.setCoastOverride(() -> superstructureCoastOverride);
+    climber.setCoastOverride(() -> superstructureCoastOverride);
 
     // Configure the button bindings
     configureButtonBindings();
@@ -341,6 +357,15 @@ public class RobotContainer {
                         driveTheta))
                 .onlyIf(() -> objectiveTracker.getAlgaeObjective().isPresent())
                 .withName("Algae Reef Intake"));
+
+    driver
+        .y()
+        .and(() -> !climberDeployed)
+        .doublePress()
+        .onTrue(climber.deploy().alongWith(Commands.runOnce(() -> climberDeployed = true)));
+    driver.y().and(() -> climberDeployed).doublePress().whileTrue(climber.climb());
+    RobotModeTriggers.disabled()
+        .onTrue(Commands.runOnce(() -> climberDeployed = false).ignoringDisable(true));
 
     // Operator command for algae intake
     operator

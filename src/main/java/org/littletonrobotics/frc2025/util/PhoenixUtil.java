@@ -23,7 +23,7 @@ public class PhoenixUtil {
   /** Signals for synchronized refresh. */
   private static BaseStatusSignal[] allSignals = new BaseStatusSignal[0];
 
-  /** Registers a signal for synchronized refresh. */
+  /** Registers a set of signals for synchronized refresh. */
   public static void registerSignals(BaseStatusSignal... signals) {
     BaseStatusSignal[] newSignals = new BaseStatusSignal[allSignals.length + signals.length];
     System.arraycopy(allSignals, 0, newSignals, 0, allSignals.length);
@@ -33,6 +33,8 @@ public class PhoenixUtil {
 
   /** Refresh all regisstered signals. */
   public static void refreshAll() {
-    BaseStatusSignal.refreshAll(allSignals);
+    if (allSignals.length > 0) {
+      BaseStatusSignal.refreshAll(allSignals);
+    }
   }
 }

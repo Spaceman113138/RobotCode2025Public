@@ -39,6 +39,7 @@ public class Leds extends VirtualSubsystem {
   public boolean superstructureCoast = false;
   public boolean superstructureEstopped = false;
   public boolean lowBatteryAlert = false;
+  public boolean visionDisconnected = false;
   public Optional<ReefLevel> firstPriorityLevel = Optional.empty();
   public Optional<ReefLevel> secondPriorityLevel = Optional.empty();
   public ReefLevel autoScoringLevel = ReefLevel.L4;
@@ -187,6 +188,11 @@ public class Leds extends VirtualSubsystem {
             secondaryDisabledColor,
             waveDisabledCycleLength,
             waveDisabledDuration);
+      }
+
+      // Vision disconnected alert
+      if (visionDisconnected) {
+        strobe(bottomQuartSection, Color.kRed, Color.kBlack, strobeDuration);
       }
 
     } else if (DriverStation.isAutonomous()) {

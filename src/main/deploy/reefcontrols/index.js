@@ -171,7 +171,7 @@ function updateUI() {
 function bind(element, callback) {
   let lastActivation = 0;
   let activate = () => {
-    if (new Date().getTime() - lastActivation > 250) {
+    if (new Date().getTime() - lastActivation > 500) {
       callback();
       lastActivation = new Date().getTime();
     }

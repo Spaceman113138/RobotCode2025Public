@@ -11,6 +11,7 @@ import static org.littletonrobotics.frc2025.subsystems.vision.VisionConstants.*;
 
 import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.geometry.*;
+import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.*;
@@ -22,6 +23,7 @@ import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.RobotState.AlgaeTxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.TxTyObservation;
 import org.littletonrobotics.frc2025.RobotState.VisionObservation;
+import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.util.GeomUtil;
 import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.VirtualSubsystem;
@@ -33,6 +35,7 @@ import org.littletonrobotics.junction.networktables.LoggedNetworkBoolean;
 public class Vision extends VirtualSubsystem {
   private final Supplier<AprilTagLayoutType> aprilTagLayoutSupplier;
   private final VisionIO[] io;
+  private final VisionIOInputsAutoLogged[] inputs;
   private final AprilTagVisionIOInputsAutoLogged[] aprilTagInputs;
   private final ObjDetectVisionIOInputsAutoLogged[] objDetectInputs;
   private final LoggedNetworkBoolean recordingRequest =
@@ -41,27 +44,40 @@ public class Vision extends VirtualSubsystem {
   private final Map<Integer, Double> lastFrameTimes = new HashMap<>();
   private final Map<Integer, Double> lastTagDetectionTimes = new HashMap<>();
 
+  private final double disconnectedTimeout = 0.5;
+  private final Timer[] disconnectedTimers;
+  private final Alert[] disconnectedAlerts;
+
   public Vision(Supplier<AprilTagLayoutType> aprilTagLayoutSupplier, VisionIO... io) {
     this.aprilTagLayoutSupplier = aprilTagLayoutSupplier;
     this.io = io;
+    inputs = new VisionIOInputsAutoLogged[io.length];
     aprilTagInputs = new AprilTagVisionIOInputsAutoLogged[io.length];
     objDetectInputs = new ObjDetectVisionIOInputsAutoLogged[io.length];
+    disconnectedTimers = new Timer[io.length];
+    disconnectedAlerts = new Alert[io.length];
     for (int i = 0; i < io.length; i++) {
+      inputs[i] = new VisionIOInputsAutoLogged();
       aprilTagInputs[i] = new AprilTagVisionIOInputsAutoLogged();
-    }
-    for (int i = 0; i < io.length; i++) {
       objDetectInputs[i] = new ObjDetectVisionIOInputsAutoLogged();
+      disconnectedAlerts[i] = new Alert("", Alert.AlertType.kError);
     }
 
     // Create map of last frame times for instances
     for (int i = 0; i < io.length; i++) {
       lastFrameTimes.put(i, 0.0);
     }
+
+    for (int i = 0; i < io.length; i++) {
+      disconnectedTimers[i] = new Timer();
+      disconnectedTimers[i].start();
+    }
   }
 
   public void periodic() {
     for (int i = 0; i < io.length; i++) {
-      io[i].updateInputs(aprilTagInputs[i], objDetectInputs[i]);
+      io[i].updateInputs(inputs[i], aprilTagInputs[i], objDetectInputs[i]);
+      Logger.processInputs("Vision/Inst" + i, aprilTagInputs[i]);
       Logger.processInputs("AprilTagVision/Inst" + i, aprilTagInputs[i]);
       Logger.processInputs("ObjDetectVision/Inst" + i, objDetectInputs[i]);
     }
@@ -71,6 +87,25 @@ public class Vision extends VirtualSubsystem {
     for (var ioInst : io) {
       ioInst.setRecording(shouldRecord);
     }
+
+    // Update disconnected alerts & LEDs
+    boolean anyDisconnected = false;
+    for (int i = 0; i < io.length; i++) {
+      if (aprilTagInputs[i].timestamps.length > 0 && objDetectInputs[i].timestamps.length > 0) {
+        disconnectedTimers[i].reset();
+      }
+      boolean disconnected =
+          disconnectedTimers[i].hasElapsed(disconnectedTimeout) || !inputs[i].ntConnected;
+      if (disconnected) {
+        disconnectedAlerts[i].setText(
+            inputs[i].ntConnected
+                ? "Northstar " + i + " connected to NT but not publishing frames"
+                : "Northstar " + i + " disconnected from NT");
+      }
+      disconnectedAlerts[i].set(disconnected);
+      anyDisconnected = anyDisconnected || disconnected;
+    }
+    Leds.getInstance().visionDisconnected = anyDisconnected;
 
     // Loop over instances
     List<Pose2d> allRobotPoses = new ArrayList<>();

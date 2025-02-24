@@ -11,6 +11,11 @@ import org.littletonrobotics.junction.AutoLog;
 
 public interface VisionIO {
   @AutoLog
+  class VisionIOInputs {
+    public boolean ntConnected = false;
+  }
+
+  @AutoLog
   class AprilTagVisionIOInputs {
     public double[] timestamps = new double[] {};
     public double[][] frames = new double[][] {};
@@ -25,7 +30,9 @@ public interface VisionIO {
   }
 
   default void updateInputs(
-      AprilTagVisionIOInputs aprilTagInputs, ObjDetectVisionIOInputs objDetectInputs) {}
+      VisionIOInputs inputs,
+      AprilTagVisionIOInputs aprilTagInputs,
+      ObjDetectVisionIOInputs objDetectInputs) {}
 
   default void setRecording(boolean active) {}
 }

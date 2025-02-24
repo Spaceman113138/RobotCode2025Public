@@ -11,7 +11,6 @@ import static org.littletonrobotics.frc2025.subsystems.vision.VisionConstants.*;
 
 import edu.wpi.first.networktables.*;
 import edu.wpi.first.util.WPIUtilJNI;
-import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Timer;
 import java.util.function.Supplier;
 import org.littletonrobotics.frc2025.FieldConstants;
@@ -22,6 +21,7 @@ public class VisionIONorthstar implements VisionIO {
   private final Supplier<AprilTagLayoutType> aprilTagLayoutSupplier;
   private AprilTagLayoutType lastAprilTagLayout = null;
 
+  private final String deviceId;
   private final DoubleArraySubscriber observationSubscriber;
   private final DoubleArraySubscriber objDetectObservationSubscriber;
   private final IntegerSubscriber fpsAprilTagsSubscriber;
@@ -31,13 +31,11 @@ public class VisionIONorthstar implements VisionIO {
   private final StringPublisher tagLayoutPublisher;
 
   private final Timer slowPeriodicTimer = new Timer();
-  private static final double disconnectedTimeout = 0.5;
-  private final Alert disconnectedAlert;
-  private final Timer disconnectedTimer = new Timer();
 
   public VisionIONorthstar(Supplier<AprilTagLayoutType> aprilTagLayoutSupplier, int index) {
     this.aprilTagLayoutSupplier = aprilTagLayoutSupplier;
-    var northstarTable = NetworkTableInstance.getDefault().getTable("northstar_" + index);
+    this.deviceId = "northstar_" + index;
+    var northstarTable = NetworkTableInstance.getDefault().getTable(this.deviceId);
     var configTable = northstarTable.getSubTable("config");
     var camera = cameras[index];
     configTable.getStringTopic("camera_id").publish().set(camera.id());
@@ -73,14 +71,22 @@ public class VisionIONorthstar implements VisionIO {
     fpsObjDetectSubscriber = outputTable.getIntegerTopic("fps_objdetect").subscribe(0);
 
     slowPeriodicTimer.start();
-    disconnectedAlert =
-        new Alert("No data from \"northstar_" + index + "\"", Alert.AlertType.kError);
-    disconnectedTimer.start();
   }
 
   public void updateInputs(
-      AprilTagVisionIOInputs aprilTagInputs, ObjDetectVisionIOInputs objDetectInputs) {
+      VisionIOInputs inputs,
+      AprilTagVisionIOInputs aprilTagInputs,
+      ObjDetectVisionIOInputs objDetectInputs) {
     boolean slowPeriodic = slowPeriodicTimer.advanceIfElapsed(1.0);
+
+    // Update NT connection status
+    inputs.ntConnected = false;
+    for (var client : NetworkTableInstance.getDefault().getConnections()) {
+      if (client.remote_id.startsWith(this.deviceId)) {
+        inputs.ntConnected = true;
+        break;
+      }
+    }
 
     // Publish timestamp
     if (slowPeriodic && SystemTimeValidReader.isValid()) {
@@ -117,12 +123,6 @@ public class VisionIONorthstar implements VisionIO {
     if (slowPeriodic) {
       objDetectInputs.fps = fpsObjDetectSubscriber.get();
     }
-
-    // Update disconnected alert
-    if (aprilTagQueue.length > 0 || objDetectQueue.length > 0) {
-      disconnectedTimer.reset();
-    }
-    disconnectedAlert.set(disconnectedTimer.hasElapsed(disconnectedTimeout));
   }
 
   public void setRecording(boolean active) {
