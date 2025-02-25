@@ -18,13 +18,16 @@ import java.util.function.DoubleSupplier;
 import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
+import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
 
 public class DriveToStation extends DriveToPose {
   private static final LoggedTunableNumber stationAlignDistance =
-      new LoggedTunableNumber("DriveToStation/StationAlignDistance", 0.4);
+      new LoggedTunableNumber(
+          "DriveToStation/StationAlignDistance",
+          DriveConstants.robotWidth / 2.0 + Units.inchesToMeters(2.0));
   private static final LoggedTunableNumber horizontalMaxOffset =
       new LoggedTunableNumber(
           "DriveToStation/HorizontalMaxOffset",
@@ -36,9 +39,9 @@ public class DriveToStation extends DriveToPose {
 
   public DriveToStation(
       Drive drive,
-      DoubleSupplier linearX,
-      DoubleSupplier linearY,
-      DoubleSupplier theta,
+      DoubleSupplier driverX,
+      DoubleSupplier driverY,
+      DoubleSupplier driverOmega,
       boolean sideIntaking) {
     super(
         drive,
@@ -82,11 +85,8 @@ public class DriveToStation extends DriveToPose {
         RobotState.getInstance()::getEstimatedPose,
         () ->
             DriveCommands.getLinearVelocityFromJoysticks(
-                    linearX.getAsDouble(), linearY.getAsDouble())
+                    driverX.getAsDouble(), driverY.getAsDouble())
                 .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
-        () ->
-            Math.copySign(
-                Math.pow(MathUtil.applyDeadband(theta.getAsDouble(), DriveCommands.DEADBAND), 2.0),
-                theta.getAsDouble()));
+        () -> DriveCommands.getOmegaFromJoysticks(driverOmega.getAsDouble()));
   }
 }

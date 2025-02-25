@@ -45,8 +45,8 @@ public class Leds extends VirtualSubsystem {
   public ReefLevel autoScoringLevel = ReefLevel.L4;
   public boolean firstPriorityBlocked = false;
   public boolean secondPriorityBlocked = false;
-  public String hexColor = "";
-  public String secondaryHexColor = "";
+  public Color hexColor = Color.kBlack;
+  public Color secondaryHexColor = Color.kBlack;
 
   private Optional<Alliance> alliance = Optional.empty();
   private Color disabledColor = Color.kGold;
@@ -139,6 +139,10 @@ public class Leds extends VirtualSubsystem {
     // Stop loading notifier if running
     loadingNotifier.stop();
 
+    // Strategy priorities
+    hexColor = renderPriority(firstPriorityLevel, firstPriorityBlocked, topSection);
+    secondaryHexColor = renderPriority(secondPriorityLevel, secondPriorityBlocked, bottomSection);
+
     // Select LED mode
     solid(fullSection, Color.kBlack); // Default to off
     if (estopped) {
@@ -199,34 +203,8 @@ public class Leds extends VirtualSubsystem {
       wave(fullSection, Color.kGold, Color.kDarkBlue, waveFastCycleLength, waveFastDuration);
 
     } else {
-      // Strategy priorities
-      TriFunction<Optional<ReefLevel>, Boolean, Section, Color> renderPriority =
-          (level, blocked, section) -> {
-            Color primaryColor =
-                level.isEmpty()
-                    ? Color.kBlack
-                    : switch (level.get()) {
-                      case L1 -> l1PriorityColor;
-                      case L2 -> l2PriorityColor;
-                      case L3 -> l3PriorityColor;
-                      case L4 -> l4PriorityColor;
-                    };
-            if (blocked == false) {
-              return solid(section, primaryColor);
-            } else {
-              return breath(
-                  section,
-                  primaryColor,
-                  Color.lerpRGB(primaryColor, Color.kBlack, 0.9),
-                  breathFastDuration);
-            }
-          };
-      hexColor =
-          renderPriority.accept(firstPriorityLevel, firstPriorityBlocked, topSection).toHexString();
-      secondaryHexColor =
-          renderPriority
-              .accept(secondPriorityLevel, secondPriorityBlocked, bottomSection)
-              .toHexString();
+      solid(topSection, hexColor);
+      solid(bottomSection, secondaryHexColor);
 
       // Auto scoring
       if (autoScoring) {
@@ -258,8 +236,8 @@ public class Leds extends VirtualSubsystem {
     }
 
     // Update dashboard
-    SmartDashboard.putString("LEDs/First Priority", hexColor);
-    SmartDashboard.putString("LEDs/Second Priority", secondaryHexColor);
+    SmartDashboard.putString("LEDs/First Priority", hexColor.toHexString());
+    SmartDashboard.putString("LEDs/Second Priority", secondaryHexColor.toHexString());
 
     // Update LEDs
     leds.setData(buffer);
@@ -290,6 +268,16 @@ public class Leds extends VirtualSubsystem {
     double blue = (c1.blue * (1 - ratio)) + (c2.blue * ratio);
     var color = new Color(red, green, blue);
     solid(section, color);
+    return color;
+  }
+
+  private Color breathCalculate(Section section, Color c1, Color c2, double duration) {
+    double x = ((Timer.getTimestamp() % duration) / duration) * 2.0 * Math.PI;
+    double ratio = (Math.sin(x) + 1.0) / 2.0;
+    double red = (c1.red * (1 - ratio)) + (c2.red * ratio);
+    double green = (c1.green * (1 - ratio)) + (c2.green * ratio);
+    double blue = (c1.blue * (1 - ratio)) + (c2.blue * ratio);
+    var color = new Color(red, green, blue);
     return color;
   }
 
@@ -338,8 +326,24 @@ public class Leds extends VirtualSubsystem {
 
   private static record Section(int start, int end) {}
 
-  @FunctionalInterface
-  public interface TriFunction<A, B, C, D> {
-    D accept(A a, B b, C c);
+  private Color renderPriority(Optional<ReefLevel> level, Boolean blocked, Section section) {
+    Color primaryColor =
+        level.isEmpty()
+            ? Color.kBlack
+            : switch (level.get()) {
+              case L1 -> l1PriorityColor;
+              case L2 -> l2PriorityColor;
+              case L3 -> l3PriorityColor;
+              case L4 -> l4PriorityColor;
+            };
+    if (blocked == false) {
+      return primaryColor;
+    } else {
+      return breathCalculate(
+          section,
+          primaryColor,
+          Color.lerpRGB(primaryColor, Color.kBlack, 0.9),
+          breathFastDuration);
+    }
   }
 }

@@ -37,7 +37,7 @@ import org.littletonrobotics.junction.Logger;
 
 public class Dispenser {
   public static final Rotation2d minAngle = Rotation2d.fromDegrees(-220.0);
-  public static final Rotation2d maxAngle = Rotation2d.fromDegrees(40.0);
+  public static final Rotation2d maxAngle = Rotation2d.fromDegrees(20.0);
 
   // Tunable numbers
   private static final LoggedTunableNumber kP = new LoggedTunableNumber("Dispenser/kP");
@@ -91,6 +91,7 @@ public class Dispenser {
   // Overrides
   private BooleanSupplier coastOverride = () -> false;
   private BooleanSupplier disabledOverride = () -> false;
+  private BooleanSupplier disableGamePieceDetectionOverride = () -> false;
 
   @AutoLogOutput(key = "Dispenser/PivotBrakeModeEnabled")
   private boolean brakeModeEnabled = true;
@@ -109,8 +110,10 @@ public class Dispenser {
   @Setter private double tunnelVolts = 0.0;
   @Setter private double gripperCurrent = 0.0;
 
+  @AutoLogOutput private boolean hasCoral = false;
   @AutoLogOutput private boolean hasAlgae = false;
 
+  private Debouncer coralDebouncer = new Debouncer(0.1);
   private Debouncer algaeDebouncer = new Debouncer(0.1);
   private Debouncer toleranceDebouncer = new Debouncer(0.25, DebounceType.kRising);
 
@@ -138,6 +141,10 @@ public class Dispenser {
     if (Constants.getRobot() == Constants.RobotType.SIMBOT) {
       new Trigger(() -> DriverStation.getStickButtonPressed(2, 1))
           .onTrue(Commands.runOnce(() -> hasAlgae = !hasAlgae));
+    }
+    if (Constants.getRobot() == Constants.RobotType.SIMBOT) {
+      new Trigger(() -> DriverStation.getStickButtonPressed(2, 2))
+          .onTrue(Commands.runOnce(() -> hasCoral = !hasCoral));
     }
   }
 
@@ -234,6 +241,12 @@ public class Dispenser {
       hasAlgae =
           algaeDebouncer.calculate(
               Math.abs(gripperInputs.data.supplyCurrentAmps()) >= algaeIntakeCurrentThresh.get());
+      if (Math.abs(tunnelInputs.data.torqueCurrentAmps()) >= 5.0) {
+        hasCoral =
+            coralDebouncer.calculate(Math.abs(tunnelInputs.data.velocityRadsPerSec()) <= 3.0);
+      } else {
+        coralDebouncer.calculate(hasCoral);
+      }
     }
 
     // Log state
@@ -255,16 +268,24 @@ public class Dispenser {
   }
 
   public boolean hasAlgae() {
-    return hasAlgae;
+    return hasAlgae && !disableGamePieceDetectionOverride.getAsBoolean();
+  }
+
+  public boolean hasCoral() {
+    return hasCoral || disableGamePieceDetectionOverride.getAsBoolean();
   }
 
   public Rotation2d getPivotAngle() {
     return pivotInputs.data.internalPosition();
   }
 
-  public void setOverrides(BooleanSupplier coastOverride, BooleanSupplier disabledOverride) {
+  public void setOverrides(
+      BooleanSupplier coastOverride,
+      BooleanSupplier disabledOverride,
+      BooleanSupplier disableGamePieceDetectionOverride) {
     this.coastOverride = coastOverride;
     this.disabledOverride = disabledOverride;
+    this.disableGamePieceDetectionOverride = disableGamePieceDetectionOverride;
   }
 
   private void setBrakeMode(boolean enabled) {

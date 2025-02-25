@@ -7,7 +7,12 @@
 
 package org.littletonrobotics.frc2025;
 
+import edu.wpi.first.math.geometry.Pose2d;
+import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Transform2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.system.plant.DCMotor;
+import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.Alert.AlertType;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -23,6 +28,8 @@ import edu.wpi.first.wpilibj2.command.button.RobotModeTriggers;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import java.util.function.BiConsumer;
 import java.util.function.DoubleSupplier;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import lombok.experimental.ExtensionMethod;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.FieldConstants.AprilTagLayoutType;
@@ -42,6 +49,7 @@ import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIO;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSim;
 import org.littletonrobotics.frc2025.subsystems.rollers.RollerSystemIOSpark;
 import org.littletonrobotics.frc2025.subsystems.superstructure.Superstructure;
+import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureConstants;
 import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureState;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.ChariotIO;
@@ -81,6 +89,12 @@ public class RobotContainer {
   private final Trigger robotRelative = overrides.driverSwitch(0);
   private final Trigger superstructureDisable = overrides.driverSwitch(1);
   private final Trigger superstructureCoast = overrides.driverSwitch(2);
+  private final Trigger disableAutoCoralStationIntake = overrides.operatorSwitch(0);
+  private final Trigger disableReefAutoAlign = overrides.operatorSwitch(1);
+  private final Trigger disableCoralStationAutoAlign = overrides.operatorSwitch(2);
+  private final Trigger disableAlgaeScoreAutoAlign = overrides.operatorSwitch(3);
+  private final Trigger disableDispenserGamePieceDetection = overrides.operatorSwitch(4);
+
   private final Trigger aprilTagsReef = overrides.multiDirectionSwitchLeft();
   private final Trigger aprilTagFieldBorder = overrides.multiDirectionSwitchRight();
   private final Alert aprilTagLayoutAlert = new Alert("", AlertType.kInfo);
@@ -175,6 +189,9 @@ public class RobotContainer {
           chariot =
               new Chariot(
                   new ChariotIOSim(), new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
+          funnel =
+              new RollerSystem(
+                  "Funnel", new RollerSystemIOSim(DCMotor.getKrakenX60Foc(1), 1.0, 0.02));
         }
       }
     }
@@ -246,9 +263,12 @@ public class RobotContainer {
     autoChooser.addOption("Pivot static", dispenser.staticCharacterization(2.0));
 
     // Set up overrides
-    superstructure.setDisabledOverride(superstructureDisable);
+    superstructure.setOverrides(superstructureDisable, disableAutoCoralStationIntake);
     elevator.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
-    dispenser.setOverrides(() -> superstructureCoastOverride, superstructureDisable);
+    dispenser.setOverrides(
+        () -> superstructureCoastOverride,
+        superstructureDisable,
+        disableDispenserGamePieceDetection);
     chariot.setCoastOverride(() -> superstructureCoastOverride);
     climber.setCoastOverride(() -> superstructureCoastOverride);
 
@@ -263,9 +283,335 @@ public class RobotContainer {
    * edu.wpi.first.wpilibj2.command.button.JoystickButton}.
    */
   private void configureButtonBindings() {
-    DoubleSupplier driveLinearX = () -> -driver.getLeftY() - operator.getLeftY();
-    DoubleSupplier driveLinearY = () -> -driver.getLeftX() - operator.getLeftX();
-    DoubleSupplier driveTheta = () -> -driver.getRightX() - operator.getRightX();
+    // Drive suppliers
+    DoubleSupplier driverX = () -> -driver.getLeftY() - operator.getLeftY();
+    DoubleSupplier driverY = () -> -driver.getLeftX() - operator.getLeftX();
+    DoubleSupplier driverOmega = () -> -driver.getRightX() - operator.getRightX();
+
+    // Joystick drive command (driver and operator)
+    Supplier<Command> joystickDriveCommandFactory =
+        () -> DriveCommands.joystickDrive(drive, driverX, driverY, driverOmega, robotRelative);
+    drive.setDefaultCommand(joystickDriveCommandFactory.get());
+
+    // ***** DRIVER CONTROLLER *****
+
+    // Score coral #1
+    Container<ReefLevel> firstPriorityReefLevel = new Container<>();
+    driver
+        .rightTrigger()
+        .and(
+            () ->
+                objectiveTracker
+                    .getFirstLevel()
+                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
+                    .isPresent())
+        .onTrue(
+            Commands.runOnce(
+                () -> firstPriorityReefLevel.value = objectiveTracker.getFirstLevel().get()))
+        .whileTrue(
+            AutoScore.getAutoScoreCommand(
+                    drive,
+                    superstructure,
+                    funnel,
+                    objectiveTracker::requestScored,
+                    () -> firstPriorityReefLevel.value,
+                    () -> objectiveTracker.getCoralObjective(firstPriorityReefLevel.value),
+                    driverX,
+                    driverY,
+                    driverOmega,
+                    joystickDriveCommandFactory.get(),
+                    disableReefAutoAlign)
+                .withName("Auto Score Priority #1"));
+
+    // Score coral #2
+    Container<ReefLevel> secondPriorityReefLevel = new Container<>();
+    driver
+        .rightBumper()
+        .and(
+            () ->
+                objectiveTracker
+                    .getSecondLevel()
+                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
+                    .isPresent())
+        .onTrue(
+            Commands.runOnce(
+                () -> secondPriorityReefLevel.value = objectiveTracker.getSecondLevel().get()))
+        .whileTrue(
+            AutoScore.getAutoScoreCommand(
+                    drive,
+                    superstructure,
+                    funnel,
+                    objectiveTracker::requestScored,
+                    () -> secondPriorityReefLevel.value,
+                    () -> objectiveTracker.getCoralObjective(secondPriorityReefLevel.value),
+                    driverX,
+                    driverY,
+                    driverOmega,
+                    joystickDriveCommandFactory.get(),
+                    disableReefAutoAlign)
+                .withName("Auto Score Priority #2"));
+
+    // Climbing controls
+    driver
+        .y()
+        .and(() -> !climberDeployed)
+        .doublePress()
+        .onTrue(climber.deploy().alongWith(Commands.runOnce(() -> climberDeployed = true)));
+    driver.y().and(() -> climberDeployed).doublePress().whileTrue(climber.climb());
+    RobotModeTriggers.disabled()
+        .onTrue(Commands.runOnce(() -> climberDeployed = false).ignoringDisable(true));
+
+    // Coral intake
+    driver
+        .leftTrigger()
+        .whileTrue(
+            Commands.either(
+                    joystickDriveCommandFactory.get(),
+                    new DriveToStation(drive, driverX, driverY, driverOmega, true),
+                    disableCoralStationAutoAlign)
+                .alongWith(IntakeCommands.intake(superstructure, funnel))
+                .withName("Coral Station Intake"));
+
+    // Algae reef intake & score
+    Trigger shouldProcess =
+        new Trigger(
+            () ->
+                AllianceFlipUtil.applyY(RobotState.getInstance().getEstimatedPose().getY())
+                    < FieldConstants.fieldWidth / 2);
+    Container<Boolean> hasAlgae = new Container<>(false);
+    driver.leftBumper().onTrue(Commands.runOnce(() -> hasAlgae.value = superstructure.hasAlgae()));
+
+    // Algae reef intake
+    driver
+        .leftBumper()
+        .and(() -> !hasAlgae.value)
+        .whileTrue(
+            AutoScore.getReefIntakeCommand(
+                    drive,
+                    superstructure,
+                    objectiveTracker::requestAlgaeIntaked,
+                    objectiveTracker::getAlgaeObjective,
+                    driverX,
+                    driverY,
+                    driverOmega,
+                    joystickDriveCommandFactory.get(),
+                    disableReefAutoAlign)
+                .onlyIf(() -> objectiveTracker.getAlgaeObjective().isPresent())
+                .withName("Algae Reef Intake"));
+
+    // Operator command for algae intake
+    Function<Boolean, Command> algaeProcessCommand =
+        eject ->
+            Commands.either(
+                    joystickDriveCommandFactory.get(),
+                    new DriveToPose(
+                        drive,
+                        () ->
+                            AutoScore.getDriveTarget(
+                                RobotState.getInstance().getEstimatedPose(),
+                                AllianceFlipUtil.apply(
+                                    FieldConstants.Processor.centerFace.transformBy(
+                                        new Transform2d(
+                                            new Translation2d(
+                                                DriveConstants.robotWidth / 2.0
+                                                    + Units.inchesToMeters(3.0),
+                                                0),
+                                            Rotation2d.kPi)))),
+                        RobotState.getInstance()::getEstimatedPose,
+                        () ->
+                            DriveCommands.getLinearVelocityFromJoysticks(
+                                    driverX.getAsDouble(), driverY.getAsDouble())
+                                .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
+                        () -> DriveCommands.getOmegaFromJoysticks(driverOmega.getAsDouble())),
+                    disableAlgaeScoreAutoAlign)
+                .alongWith(
+                    eject
+                        ? superstructure.runGoal(SuperstructureState.PROCESSED)
+                        : superstructure.runGoal(SuperstructureState.POST_PRE_PROCESSOR));
+
+    // Algae pre-processor
+    driver
+        .leftBumper()
+        .and(shouldProcess)
+        .and(() -> hasAlgae.value)
+        .and(driver.a().negate())
+        .whileTrueContinuous(algaeProcessCommand.apply(false).withName("Algae Pre-Processor"));
+
+    // Algae process
+    driver
+        .leftBumper()
+        .and(shouldProcess)
+        .and(() -> hasAlgae.value)
+        .and(driver.a())
+        .whileTrueContinuous(algaeProcessCommand.apply(true).withName("Algae Processing"));
+
+    Function<Boolean, Command> algaeNetCommand =
+        eject -> {
+          var autoAlignCommand =
+              new DriveToPose(
+                  drive,
+                  () ->
+                      new Pose2d(
+                          AllianceFlipUtil.applyX(
+                              FieldConstants.fieldLength / 2.0
+                                  - FieldConstants.Barge.netWidth / 2.0
+                                  - FieldConstants.algaeDiameter
+                                  - SuperstructureConstants.pivotToTunnelFront
+                                      * Math.cos(20.0 / 180.0 * Math.PI)
+                                  - SuperstructureConstants.elevatorMaxTravel
+                                      * SuperstructureConstants.elevatorAngle.getCos()
+                                  - SuperstructureConstants.dispenserOrigin2d.getX()
+                                  - Units.inchesToMeters(5.0)),
+                          RobotState.getInstance().getEstimatedPose().getY(),
+                          Rotation2d.kZero),
+                  RobotState.getInstance()::getEstimatedPose,
+                  () ->
+                      DriveCommands.getLinearVelocityFromJoysticks(0, driverY.getAsDouble())
+                          .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
+                  () -> 0);
+
+          return Commands.either(
+                  joystickDriveCommandFactory.get(), autoAlignCommand, disableAlgaeScoreAutoAlign)
+              .alongWith(
+                  Commands.waitUntil(
+                          () ->
+                              disableAlgaeScoreAutoAlign.getAsBoolean()
+                                  || (autoAlignCommand.isRunning()
+                                      && autoAlignCommand.withinTolerance(
+                                          Units.inchesToMeters(20.0),
+                                          Rotation2d.fromDegrees(10.0))))
+                      .andThen(
+                          eject
+                              ? superstructure.runGoal(SuperstructureState.THROWN)
+                              : superstructure.runGoal(SuperstructureState.PRE_THROWN)));
+        };
+
+    // Algae pre-net
+    driver
+        .leftBumper()
+        .and(shouldProcess.negate())
+        .and(() -> hasAlgae.value)
+        .and(driver.a().negate())
+        .whileTrueContinuous(algaeNetCommand.apply(false).withName("Algae Pre-Net"));
+
+    // Algae net score
+    driver
+        .leftBumper()
+        .and(shouldProcess.negate())
+        .and(() -> hasAlgae.value)
+        .and(driver.a())
+        .whileTrueContinuous(algaeNetCommand.apply(true).withName("Algae Net Score"));
+
+    // Algae eject
+    driver
+        .a()
+        .and(driver.leftBumper().negate())
+        .whileTrue(superstructure.runGoal(SuperstructureState.TOSS).withName("Algae Toss"));
+
+    // Strobe LEDs at human player
+    driver
+        .y()
+        .whileTrue(
+            Commands.startEnd(
+                () -> leds.hpAttentionAlert = true, () -> leds.hpAttentionAlert = false));
+
+    // Coral eject
+    driver.b().whileTrue(superstructure.runGoal(SuperstructureState.L1_CORAL_EJECT));
+
+    // Force net
+    driver.povLeft().whileTrue(superstructure.runGoal(SuperstructureState.THROWN));
+
+    // Force processor
+    driver.povRight().whileTrue(superstructure.runGoal(SuperstructureState.PROCESSED));
+
+    // Force coral intake
+    driver.rightStick().whileTrue(IntakeCommands.intake(superstructure, funnel));
+
+    // ***** OPERATOR CONTROLLER *****
+
+    // Algae ground intake
+    operator
+        .leftTrigger()
+        .whileTrue(
+            superstructure
+                .runGoal(SuperstructureState.ALGAE_FLOOR_INTAKE)
+                .withName("Algae Floor Intake"));
+
+    // Coral intake
+    operator.rightBumper().whileTrue(IntakeCommands.intake(superstructure, funnel));
+
+    // Home elevator
+    operator.leftBumper().onTrue(superstructure.runHomingSequence());
+
+    // Force net
+    operator.povLeft().whileTrue(superstructure.runGoal(SuperstructureState.THROWN));
+
+    // Force processor
+    operator.povRight().whileTrue(superstructure.runGoal(SuperstructureState.PROCESSED));
+
+    // Algae eject
+    operator
+        .rightTrigger()
+        .and(operator.a().negate())
+        .and(operator.b().negate())
+        .and(operator.x().negate())
+        .and(operator.y().negate())
+        .whileTrue(superstructure.runGoal(SuperstructureState.TOSS));
+
+    // Operator commands for superstructure
+    BiConsumer<Trigger, ReefLevel> bindOperatorCoralScore =
+        (faceButton, height) -> {
+          faceButton.whileTrueContinuous(
+              superstructure
+                  .runGoal(
+                      () ->
+                          Superstructure.getScoringState(
+                              height,
+                              superstructure.hasAlgae()
+                                  || disableDispenserGamePieceDetection.getAsBoolean(),
+                              false))
+                  .withName("Operator Score on " + height));
+          faceButton
+              .and(operator.rightTrigger())
+              .whileTrueContinuous(
+                  superstructure
+                      .runGoal(
+                          () ->
+                              Superstructure.getScoringState(
+                                  height,
+                                  superstructure.hasAlgae()
+                                      || disableDispenserGamePieceDetection.getAsBoolean(),
+                                  true))
+                      .withName("Operator Score & Eject On " + height));
+        };
+    bindOperatorCoralScore.accept(operator.a(), ReefLevel.L1);
+    bindOperatorCoralScore.accept(operator.x(), ReefLevel.L2);
+    bindOperatorCoralScore.accept(operator.b(), ReefLevel.L3);
+    bindOperatorCoralScore.accept(operator.y(), ReefLevel.L4);
+
+    // ***** MISCELlANEOUS *****
+
+    // Auto intake coral
+    funnel.setDefaultCommand(
+        funnel.runRoller(
+            () -> superstructure.isRequestFunnelIntake() ? IntakeCommands.funnelVolts.get() : 0.0));
+
+    // Reset gyro
+    var driverStartAndBack = driver.start().and(driver.back());
+    var operatorStartAndBack = operator.start().and(operator.back());
+    driverStartAndBack
+        .or(operatorStartAndBack)
+        .onTrue(
+            Commands.runOnce(
+                    () ->
+                        RobotState.getInstance()
+                            .resetPose(
+                                new Pose2d(
+                                    RobotState.getInstance().getEstimatedPose().getTranslation(),
+                                    AllianceFlipUtil.apply(new Rotation2d()))))
+                .ignoringDisable(true));
+
+    // Superstructure coast
     superstructureCoast
         .onTrue(
             Commands.runOnce(
@@ -292,127 +638,7 @@ public class RobotContainer {
                     })
                 .ignoringDisable(true));
 
-    // Default command, normal field-relative drive
-    drive.setDefaultCommand(
-        DriveCommands.joystickDrive(drive, driveLinearX, driveLinearY, driveTheta, robotRelative));
-
-    Container<ReefLevel> firstPriorityReefLevel = new Container<>();
-    driver
-        .a()
-        .and(
-            () ->
-                objectiveTracker
-                    .getFirstLevel()
-                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
-                    .isPresent())
-        .onTrue(
-            Commands.runOnce(
-                () -> firstPriorityReefLevel.value = objectiveTracker.getFirstLevel().get()))
-        .whileTrue(
-            AutoScore.getAutoScoreCommand(
-                    drive,
-                    superstructure,
-                    objectiveTracker::requestScored,
-                    () -> firstPriorityReefLevel.value,
-                    () -> objectiveTracker.getCoralObjective(firstPriorityReefLevel.value),
-                    driveLinearX,
-                    driveLinearY,
-                    driveTheta)
-                .withName("Auto Score Priority #1"));
-    Container<ReefLevel> secondPriorityReefLevel = new Container<>();
-    driver
-        .b()
-        .and(
-            () ->
-                objectiveTracker
-                    .getSecondLevel()
-                    .filter(reefLevel -> objectiveTracker.getCoralObjective(reefLevel).isPresent())
-                    .isPresent())
-        .onTrue(
-            Commands.runOnce(
-                () -> secondPriorityReefLevel.value = objectiveTracker.getSecondLevel().get()))
-        .whileTrue(
-            AutoScore.getAutoScoreCommand(
-                    drive,
-                    superstructure,
-                    objectiveTracker::requestScored,
-                    () -> secondPriorityReefLevel.value,
-                    () -> objectiveTracker.getCoralObjective(secondPriorityReefLevel.value),
-                    driveLinearX,
-                    driveLinearY,
-                    driveTheta)
-                .withName("Auto Score Priority #2"));
-    driver
-        .x()
-        .whileTrue(
-            Commands.waitUntil(() -> !superstructure.hasAlgae())
-                .andThen(
-                    AutoScore.getReefIntakeCommand(
-                        drive,
-                        superstructure,
-                        objectiveTracker::requestAlgaeIntaked,
-                        objectiveTracker::getAlgaeObjective,
-                        driveLinearX,
-                        driveLinearY,
-                        driveTheta))
-                .onlyIf(() -> objectiveTracker.getAlgaeObjective().isPresent())
-                .withName("Algae Reef Intake"));
-
-    driver
-        .y()
-        .and(() -> !climberDeployed)
-        .doublePress()
-        .onTrue(climber.deploy().alongWith(Commands.runOnce(() -> climberDeployed = true)));
-    driver.y().and(() -> climberDeployed).doublePress().whileTrue(climber.climb());
-    RobotModeTriggers.disabled()
-        .onTrue(Commands.runOnce(() -> climberDeployed = false).ignoringDisable(true));
-
-    // Operator command for algae intake
-    operator
-        .leftBumper()
-        .whileTrue(
-            superstructure
-                .runGoal(SuperstructureState.ALGAE_FLOOR_INTAKE)
-                .withName("Algae Floor Intake"));
-
-    // Operator command for coral intake
-    operator.leftTrigger().whileTrue(IntakeCommands.intake(superstructure, funnel));
-
-    // Operator command for homing elevator
-    operator.leftBumper().onTrue(superstructure.runHomingSequence());
-
-    // Operator commands for superstructure
-    BiConsumer<Trigger, ReefLevel> bindOperatorCoralScore =
-        (faceButton, height) -> {
-          faceButton.whileTrueContinuous(
-              superstructure
-                  .runGoal(
-                      () ->
-                          Superstructure.getScoringState(height, superstructure.hasAlgae(), false))
-                  .withName("Operator Score on " + height));
-          faceButton
-              .and(operator.rightTrigger())
-              .whileTrueContinuous(
-                  superstructure
-                      .runGoal(
-                          () ->
-                              Superstructure.getScoringState(
-                                  height, superstructure.hasAlgae(), true))
-                      .withName("Operator Score & Eject On " + height));
-        };
-    bindOperatorCoralScore.accept(operator.a(), ReefLevel.L1);
-    bindOperatorCoralScore.accept(operator.x(), ReefLevel.L2);
-    bindOperatorCoralScore.accept(operator.b(), ReefLevel.L3);
-    bindOperatorCoralScore.accept(operator.y(), ReefLevel.L4);
-
-    // Strobe LEDs at human player
-    driver
-        .y()
-        .whileTrue(
-            Commands.startEnd(
-                () -> leds.hpAttentionAlert = true, () -> leds.hpAttentionAlert = false));
-
-    // Endgame Alerts
+    // Endgame alerts
     new Trigger(
             () ->
                 DriverStation.isTeleopEnabled()

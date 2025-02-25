@@ -7,15 +7,17 @@
 
 package org.littletonrobotics.frc2025.commands;
 
-import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.geometry.Transform2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
+import java.util.Comparator;
 import java.util.function.DoubleSupplier;
+import org.littletonrobotics.frc2025.FieldConstants;
 import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.drive.Drive;
+import org.littletonrobotics.frc2025.subsystems.drive.DriveConstants;
 import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.Logger;
@@ -25,63 +27,68 @@ public class DriveToAlgae extends DriveToPose {
       new LoggedTunableNumber("DriveToAlgae/LookAheadSecs", 0.3);
   private static final LoggedTunableNumber angleDifferenceWeight =
       new LoggedTunableNumber("DriveToAlgae/AngleDifferenceWeight", 0.3);
+  private static final LoggedTunableNumber algaeMaxDistance =
+      new LoggedTunableNumber("DriveToAlgae/AlgaeMaxDistance", 1.4);
+  private static final LoggedTunableNumber algaeMaxAngleDeg =
+      new LoggedTunableNumber("DriveToAlgae/AlgaeMaxAngleDegrees", 70.0);
 
   public DriveToAlgae(
-      Drive drive, DoubleSupplier linearX, DoubleSupplier linearY, DoubleSupplier theta) {
+      Drive drive, DoubleSupplier driverX, DoubleSupplier driverY, DoubleSupplier driverOmega) {
     super(
         drive,
         () -> {
           RobotState instance = RobotState.getInstance();
-          Pose2d currentPose = instance.getEstimatedPose();
+          Pose2d robot = instance.getEstimatedPose();
 
           ChassisSpeeds robotVelocity = instance.getRobotVelocity();
-          Translation2d linearFieldVelocity =
-              new Translation2d(robotVelocity.vxMetersPerSecond, robotVelocity.vyMetersPerSecond);
 
-          Pose2d lookAheadPose =
-              instance
-                  .getEstimatedPose()
-                  .transformBy(
-                      new Transform2d(linearFieldVelocity, new Rotation2d())
-                          .times(lookAheadSecs.get()));
-          Logger.recordOutput("DriveToAlgae/LookAheadPose", lookAheadPose);
+          Pose2d predictedRobot =
+              instance.getEstimatedPose().exp(robotVelocity.toTwist2d(lookAheadSecs.get()));
+          Logger.recordOutput("DriveToAlgae/LookAheadPose", predictedRobot);
 
-          double closestValue = 999;
-
-          Pose2d closestAlgae = new Pose2d();
-
-          for (var algae : instance.getAlgaeTranslations()) {
-            if (algae == null) {
-              closestAlgae = new Pose2d(algae, new Rotation2d());
-            } else {
-              double value =
-                  algae.getDistance(lookAheadPose.getTranslation())
-                      + Math.abs(
-                          algae
-                                  .minus(currentPose.getTranslation())
-                                  .getAngle()
-                                  .minus(currentPose.getRotation())
-                                  .getRadians()
-                              * angleDifferenceWeight.get());
-              if (value < closestValue) {
-                closestAlgae =
-                    new Pose2d(algae, algae.minus(currentPose.getTranslation()).getAngle());
-                closestValue = value;
-              }
-            }
-          }
-          Logger.recordOutput("DriveToAlgae/ClosestAlgae", closestAlgae);
-
-          return closestAlgae;
+          return instance.getAlgaeTranslations().stream()
+              .min(
+                  Comparator.comparingDouble(
+                      algae ->
+                          algae.getDistance(predictedRobot.getTranslation())
+                              + Math.abs(
+                                  algae
+                                          .minus(robot.getTranslation())
+                                          .getAngle()
+                                          .minus(robot.getRotation())
+                                          .getRadians()
+                                      * angleDifferenceWeight.get())))
+              .filter(
+                  algae ->
+                      algae.getDistance(predictedRobot.getTranslation()) <= algaeMaxDistance.get()
+                          && Math.abs(
+                                  algae
+                                      .minus(predictedRobot.getTranslation())
+                                      .getAngle()
+                                      .getDegrees())
+                              <= algaeMaxAngleDeg.get())
+              .map(
+                  algae -> {
+                    Logger.recordOutput("DriveToAlgae/TargetedAlgae", new Translation2d[] {algae});
+                    return new Pose2d(algae, robot.getTranslation().minus(algae).getAngle())
+                        .transformBy(
+                            new Transform2d(
+                                FieldConstants.algaeDiameter / 2.0
+                                    + DriveConstants.robotWidth / 2.0,
+                                0.0,
+                                Rotation2d.kPi));
+                  })
+              .orElseGet(
+                  () -> {
+                    Logger.recordOutput("DriveToAlgae/TargetedAlgae", new Translation2d[] {});
+                    return RobotState.getInstance().getEstimatedPose();
+                  });
         },
         RobotState.getInstance()::getEstimatedPose,
         () ->
             DriveCommands.getLinearVelocityFromJoysticks(
-                    linearX.getAsDouble(), linearY.getAsDouble())
+                    driverX.getAsDouble(), driverY.getAsDouble())
                 .times(AllianceFlipUtil.shouldFlip() ? -1.0 : 1.0),
-        () ->
-            Math.copySign(
-                Math.pow(MathUtil.applyDeadband(theta.getAsDouble(), DriveCommands.DEADBAND), 2.0),
-                theta.getAsDouble()));
+        () -> DriveCommands.getOmegaFromJoysticks(driverOmega.getAsDouble()));
   }
 }

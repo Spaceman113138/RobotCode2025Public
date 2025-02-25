@@ -27,7 +27,7 @@ import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotation2d> pivotAngle) {
   private static final double reefAlgaeIntakeAngle = 15.0;
-  private static final double reefAlgaeIntakeDispenserAngle = 40.0;
+  private static final double reefAlgaeIntakeDispenserAngle = 20.0;
 
   private static final Map<ReefLevel, Pair<Double, Double>> ejectMeters =
       Map.of(
@@ -161,7 +161,8 @@ public record SuperstructurePose(DoubleSupplier elevatorHeight, Supplier<Rotatio
     ALGAE_FLOOR_INTAKE("AlgaeFloorIntake", 0.4, -20.0),
     ALGAE_L2_INTAKE("AlgaeL2Intake", DispenserPose.L2_ALGAE_INTAKE),
     ALGAE_L3_INTAKE("AlgaeL3Intake", DispenserPose.L3_ALGAE_INTAKE),
-    THROW(() -> elevatorMaxTravel, () -> 40.0),
+    PRE_THROW("PreThrow", elevatorMaxTravel - 0.6, -40.0),
+    THROW("Throw", elevatorMaxTravel, 20.0),
     POST_PRE_PROCESSOR("Processing", 0.28, -15.0),
     ALGAE_STOW(
         "AlgaeStow",

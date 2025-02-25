@@ -95,31 +95,27 @@ public class ClimberIOTalonFX implements ClimberIO {
 
   @Override
   public void updateInputs(ClimberIOInputs inputs) {
-    // Refresh status signals and check if hardware connected
-    boolean connected =
-        BaseStatusSignal.refreshAll(
-                position, velocity, appliedVolts, supplyCurrentAmps, torqueCurrentAmps, temp)
-            .isOK();
-
-    boolean followerConnected =
-        BaseStatusSignal.refreshAll(
-                followerAppliedVolts, followerTorqueCurrent, followerSupplyCurrent, followerTemp)
-            .isOK();
-    inputs.motorConnected = motorConnectedDebouncer.calculate(connected);
-    inputs.followerConnected = motorConnectedDebouncer.calculate(followerConnected);
-    inputs.positionRads = position.getValue().in(Radians);
-    inputs.velocityRadsPerSec = velocity.getValue().in(RadiansPerSecond);
-    inputs.appliedVoltage =
-        new double[] {appliedVolts.getValueAsDouble(), followerAppliedVolts.getValueAsDouble()};
-    inputs.torqueCurrentAmps =
-        new double[] {
-          torqueCurrentAmps.getValueAsDouble(), followerTorqueCurrent.getValueAsDouble()
-        };
-    inputs.supplyCurrentAmps =
-        new double[] {
-          supplyCurrentAmps.getValueAsDouble(), followerSupplyCurrent.getValueAsDouble()
-        };
-    inputs.tempCelsius = new double[] {temp.getValueAsDouble(), followerTemp.getValueAsDouble()};
+    inputs.data =
+        new ClimberIOData(
+            motorConnectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    position, velocity, appliedVolts, supplyCurrentAmps, temp)),
+            motorConnectedDebouncer.calculate(
+                BaseStatusSignal.isAllGood(
+                    followerAppliedVolts,
+                    followerTorqueCurrent,
+                    followerSupplyCurrent,
+                    followerTemp)),
+            position.getValue().in(Radians),
+            velocity.getValue().in(RadiansPerSecond),
+            appliedVolts.getValueAsDouble(),
+            torqueCurrentAmps.getValueAsDouble(),
+            supplyCurrentAmps.getValueAsDouble(),
+            temp.getValueAsDouble(),
+            followerAppliedVolts.getValueAsDouble(),
+            followerTorqueCurrent.getValueAsDouble(),
+            followerSupplyCurrent.getValueAsDouble(),
+            followerTemp.getValueAsDouble());
   }
 
   @Override

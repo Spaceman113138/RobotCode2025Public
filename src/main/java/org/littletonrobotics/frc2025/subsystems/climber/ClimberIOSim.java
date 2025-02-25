@@ -45,10 +45,21 @@ public class ClimberIOSim implements ClimberIO {
   public void updateInputs(ClimberIOInputs inputs) {
     update(Constants.loopPeriodSecs);
     SuperstructureVisualizer.updateSimIntake(simState.get(0));
-    inputs.positionRads = simState.get(0);
-    inputs.velocityRadsPerSec = simState.get(1);
-    inputs.appliedVoltage = new double[] {appliedVolts};
-    inputs.torqueCurrentAmps = new double[] {Math.copySign(inputTorqueCurrent, appliedVolts)};
+
+    inputs.data =
+        new ClimberIOData(
+            true,
+            true,
+            simState.get(0),
+            simState.get(1),
+            appliedVolts,
+            Math.copySign(inputTorqueCurrent, appliedVolts),
+            Math.copySign(inputTorqueCurrent, appliedVolts),
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0);
   }
 
   @Override

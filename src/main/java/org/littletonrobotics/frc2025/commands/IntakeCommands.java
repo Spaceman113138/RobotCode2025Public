@@ -15,7 +15,7 @@ import org.littletonrobotics.frc2025.subsystems.superstructure.SuperstructureSta
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 
 public class IntakeCommands {
-  private static LoggedTunableNumber funnelVolts = new LoggedTunableNumber("Funnel/IntakeVolts", 8);
+  public static LoggedTunableNumber funnelVolts = new LoggedTunableNumber("Funnel/IntakeVolts", 8);
 
   private IntakeCommands() {}
 
@@ -23,7 +23,6 @@ public class IntakeCommands {
     return superstructure
         .runGoal(SuperstructureState.INTAKE)
         .alongWith(
-            Commands.waitUntil(superstructure::atGoal)
-                .andThen(funnel.runRoller(funnelVolts.get())));
+            Commands.waitUntil(superstructure::atGoal).andThen(funnel.runRoller(funnelVolts)));
   }
 }

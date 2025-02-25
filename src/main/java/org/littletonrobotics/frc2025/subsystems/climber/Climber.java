@@ -14,6 +14,7 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import java.util.function.BooleanSupplier;
 import lombok.Setter;
+import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.LoggedTunableNumber;
 import org.littletonrobotics.junction.AutoLogOutput;
 import org.littletonrobotics.junction.Logger;
@@ -27,6 +28,8 @@ public class Climber extends SubsystemBase {
       new LoggedTunableNumber("Climber/ClimbCurrent", 75);
   private static final LoggedTunableNumber climbCurrentRampRate =
       new LoggedTunableNumber("Climber/ClimbCurrentRampRate", 30);
+  private static final LoggedTunableNumber climbStopAngle =
+      new LoggedTunableNumber("Climber/ClimbStopAngle", 200);
 
   private final ClimberIO climberIO;
   private final ClimberIOInputsAutoLogged climberInputs = new ClimberIOInputsAutoLogged();
@@ -54,11 +57,14 @@ public class Climber extends SubsystemBase {
     boolean coast = coastOverride.getAsBoolean() && DriverStation.isDisabled();
     setBrakeMode(!coast);
     Logger.recordOutput("Climber/CoastOverride", !coast);
+
+    // Record cycle time
+    LoggedTracer.record("Climber");
   }
 
   public Command deploy() {
     return run(() -> climberIO.runTorqueCurrent(deployCurrent.get()))
-        .until(() -> climberInputs.positionRads >= Units.degreesToRadians(deployAngle.get()))
+        .until(() -> climberInputs.data.positionRads() >= Units.degreesToRadians(deployAngle.get()))
         .finallyDo(() -> climberIO.runTorqueCurrent(0.0));
   }
 
@@ -66,10 +72,13 @@ public class Climber extends SubsystemBase {
     Timer timer = new Timer();
     return runOnce(timer::restart)
         .andThen(
-            run(
-                () ->
+            run(() ->
                     climberIO.runTorqueCurrent(
-                        Math.min(climbCurrentRampRate.get() * timer.get(), climbCurrent.get()))))
+                        Math.min(climbCurrentRampRate.get() * timer.get(), climbCurrent.get())))
+                .until(
+                    () ->
+                        climberInputs.data.positionRads()
+                            >= Units.degreesToRadians(climbStopAngle.get())))
         .finallyDo(() -> climberIO.runTorqueCurrent(0.0));
   }
 

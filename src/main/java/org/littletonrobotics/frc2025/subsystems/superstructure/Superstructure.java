@@ -9,8 +9,8 @@ package org.littletonrobotics.frc2025.subsystems.superstructure;
 
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Pair;
+import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.trajectory.TrapezoidProfile;
 import edu.wpi.first.math.util.Units;
 import edu.wpi.first.wpilibj.Alert;
 import edu.wpi.first.wpilibj.DriverStation;
@@ -22,7 +22,6 @@ import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 import lombok.Builder;
 import lombok.Getter;
-import lombok.Setter;
 import org.jgrapht.Graph;
 import org.jgrapht.graph.DefaultDirectedGraph;
 import org.jgrapht.graph.DefaultEdge;
@@ -30,11 +29,13 @@ import org.littletonrobotics.frc2025.Constants;
 import org.littletonrobotics.frc2025.Constants.Mode;
 import org.littletonrobotics.frc2025.Constants.RobotType;
 import org.littletonrobotics.frc2025.FieldConstants;
+import org.littletonrobotics.frc2025.RobotState;
 import org.littletonrobotics.frc2025.subsystems.leds.Leds;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot;
 import org.littletonrobotics.frc2025.subsystems.superstructure.chariot.Chariot.Goal;
 import org.littletonrobotics.frc2025.subsystems.superstructure.dispenser.Dispenser;
 import org.littletonrobotics.frc2025.subsystems.superstructure.elevator.Elevator;
+import org.littletonrobotics.frc2025.util.AllianceFlipUtil;
 import org.littletonrobotics.frc2025.util.LoggedTracer;
 import org.littletonrobotics.frc2025.util.gslam.GenericSlamElevator;
 import org.littletonrobotics.junction.AutoLogOutput;
@@ -57,7 +58,8 @@ public class Superstructure extends SubsystemBase {
   @AutoLogOutput(key = "Superstructure/EStopped")
   private boolean isEStopped = false;
 
-  @Setter private BooleanSupplier disabledOverride = () -> false;
+  private BooleanSupplier disableOverride = () -> false;
+  private BooleanSupplier autoCoralStationIntakeOverride = () -> false;
   private final Alert driverDisableAlert =
       new Alert("Superstructure disabled due to driver override.", Alert.AlertType.kWarning);
   private final Alert emergencyDisableAlert =
@@ -71,13 +73,15 @@ public class Superstructure extends SubsystemBase {
       new SuperstructureVisualizer("Setpoint");
   private final SuperstructureVisualizer goalVisualizer = new SuperstructureVisualizer("Goal");
 
+  @AutoLogOutput @Getter private boolean requestFunnelIntake = false;
+
   public Superstructure(Elevator elevator, Dispenser dispenser, Chariot chariot) {
     this.elevator = elevator;
     this.dispenser = dispenser;
     this.chariot = chariot;
 
     // Updating E Stop based on disabled override
-    new Trigger(() -> disabledOverride.getAsBoolean())
+    new Trigger(() -> disableOverride.getAsBoolean())
         .onFalse(Commands.runOnce(() -> isEStopped = false).ignoringDisable(true));
 
     // Add states as vertices
@@ -124,7 +128,9 @@ public class Superstructure extends SubsystemBase {
             SuperstructureState.ALGAE_L2_INTAKE,
             SuperstructureState.ALGAE_L3_INTAKE,
             SuperstructureState.UNREVERSED,
-            SuperstructureState.PRE_PROCESSOR);
+            SuperstructureState.PRE_PROCESSOR,
+            SuperstructureState.PRE_TOSS,
+            SuperstructureState.PRE_THROWN);
 
     final Set<SuperstructureState> algaeIntakeStates =
         Set.of(
@@ -205,7 +211,9 @@ public class Superstructure extends SubsystemBase {
             Pair.of(
                 SuperstructureState.L4_CORAL_REVERSED, SuperstructureState.L4_CORAL_REVERSED_EJECT),
             Pair.of(SuperstructureState.ALGAE_STOW, SuperstructureState.PRE_PROCESSOR),
-            Pair.of(SuperstructureState.PRE_PROCESSOR, SuperstructureState.POST_PRE_PROCESSOR));
+            Pair.of(SuperstructureState.PRE_PROCESSOR, SuperstructureState.POST_PRE_PROCESSOR),
+            Pair.of(SuperstructureState.PRE_THROWN, SuperstructureState.THROWN),
+            Pair.of(SuperstructureState.PRE_TOSS, SuperstructureState.TOSS));
     for (var pair : pairedStates) {
       addEdge.accept(pair.getFirst(), pair.getSecond(), false, AlgaeEdge.NONE, true);
     }
@@ -216,10 +224,12 @@ public class Superstructure extends SubsystemBase {
             SuperstructureState.ALGAE_STOW,
             SuperstructureState.PRE_PROCESSOR,
             SuperstructureState.POST_PRE_PROCESSOR,
-            SuperstructureState.PROCESSING,
+            SuperstructureState.PROCESSED,
             SuperstructureState.UNREVERSED,
-            SuperstructureState.THROWN,
-            SuperstructureState.TOSS)) {
+            SuperstructureState.PRE_THROWN,
+            SuperstructureState.PRE_TOSS,
+            SuperstructureState.TOSS,
+            SuperstructureState.THROWN)) {
       for (var to : freeNoAlgaeStates) {
         graph.addEdge(
             from,
@@ -246,16 +256,12 @@ public class Superstructure extends SubsystemBase {
     // Add miscellaneous edges
     addEdge.accept(
         SuperstructureState.POST_PRE_PROCESSOR,
-        SuperstructureState.PROCESSING,
+        SuperstructureState.PROCESSED,
         true,
         AlgaeEdge.NONE,
         false);
     addEdge.accept(
-        SuperstructureState.ALGAE_STOW, SuperstructureState.THROWN, true, AlgaeEdge.NONE, false);
-    addEdge.accept(
-        SuperstructureState.ALGAE_STOW, SuperstructureState.TOSS, true, AlgaeEdge.NONE, false);
-    addEdge.accept(
-        SuperstructureState.PROCESSING,
+        SuperstructureState.PROCESSED,
         SuperstructureState.POST_PRE_PROCESSOR,
         false,
         AlgaeEdge.ALGAE,
@@ -263,7 +269,11 @@ public class Superstructure extends SubsystemBase {
     addEdge.accept(
         SuperstructureState.THROWN, SuperstructureState.ALGAE_STOW, false, AlgaeEdge.ALGAE, false);
     addEdge.accept(
-        SuperstructureState.TOSS, SuperstructureState.ALGAE_STOW, false, AlgaeEdge.ALGAE, false);
+        SuperstructureState.PRE_TOSS,
+        SuperstructureState.ALGAE_STOW,
+        false,
+        AlgaeEdge.ALGAE,
+        false);
     addEdge.accept(
         SuperstructureState.STOW, SuperstructureState.ALGAE_STOW, false, AlgaeEdge.ALGAE, false);
     addEdge.accept(
@@ -271,8 +281,27 @@ public class Superstructure extends SubsystemBase {
 
     setDefaultCommand(
         runGoal(
-            () ->
-                dispenser.hasAlgae() ? SuperstructureState.ALGAE_STOW : SuperstructureState.STOW));
+                () -> {
+                  // Check if should intake
+                  Pose2d robot =
+                      AllianceFlipUtil.apply(RobotState.getInstance().getEstimatedPose());
+                  if (!dispenser.hasCoral()
+                      && !dispenser.hasAlgae()
+                      && robot.getX() < FieldConstants.fieldLength / 5.0
+                      && (robot.getY() < FieldConstants.fieldWidth / 5.0
+                          || robot.getY() > FieldConstants.fieldWidth * 4.0 / 5.0)
+                      && !autoCoralStationIntakeOverride.getAsBoolean()) {
+                    if (state == SuperstructureState.INTAKE) {
+                      requestFunnelIntake = true;
+                    }
+                    return SuperstructureState.INTAKE;
+                  }
+                  requestFunnelIntake = false;
+                  return dispenser.hasAlgae()
+                      ? SuperstructureState.ALGAE_STOW
+                      : SuperstructureState.STOW;
+                })
+            .finallyDo(() -> requestFunnelIntake = false));
   }
 
   @Override
@@ -315,7 +344,7 @@ public class Superstructure extends SubsystemBase {
     elevator.setEStopped(isEStopped);
     dispenser.setEStopped(isEStopped);
 
-    driverDisableAlert.set(disabledOverride.getAsBoolean());
+    driverDisableAlert.set(disableOverride.getAsBoolean());
     emergencyDisableAlert.set(isEStopped);
     Leds.getInstance().superstructureEstopped = isEStopped;
 
@@ -346,7 +375,7 @@ public class Superstructure extends SubsystemBase {
         elevator.getGoalMeters(),
         Rotation2d.fromRadians(dispenser.getGoal()),
         switch (chariot.getGoal()) {
-          case IDLE -> 0.0;
+          case IDLE -> chariot.getPosition();
           case RETRACT -> 0.0;
           case DEPLOY -> SuperstructureConstants.chariotMaxExtension;
           case HALF_OUT -> Units.inchesToMeters(Chariot.halfOutPositionInches.get());
@@ -357,6 +386,12 @@ public class Superstructure extends SubsystemBase {
     LoggedTracer.record("Superstructure");
   }
 
+  public void setOverrides(
+      BooleanSupplier disableOverride, BooleanSupplier autoCoralStationIntakeOverride) {
+    this.disableOverride = disableOverride;
+    this.autoCoralStationIntakeOverride = autoCoralStationIntakeOverride;
+  }
+
   @AutoLogOutput(key = "Superstructure/AtGoal")
   public boolean atGoal() {
     return state == goal;
@@ -364,6 +399,10 @@ public class Superstructure extends SubsystemBase {
 
   public boolean hasAlgae() {
     return dispenser.hasAlgae();
+  }
+
+  public boolean hasCoral() {
+    return dispenser.hasCoral();
   }
 
   private void setGoal(SuperstructureState goal) {
@@ -466,26 +505,7 @@ public class Superstructure extends SubsystemBase {
    * subsystems are complete with profiles.
    */
   private EdgeCommand getEdgeCommand(SuperstructureState from, SuperstructureState to) {
-    if ((from == SuperstructureState.ALGAE_STOW && to == SuperstructureState.THROWN)) {
-      // Algae Stow Front --> Thrown
-      return EdgeCommand.builder()
-          .command(
-              Commands.runOnce(
-                      () -> {
-                        elevator.setGoal(
-                            () ->
-                                new TrapezoidProfile.State(
-                                    SuperstructureConstants.throwHeight.get(),
-                                    SuperstructureConstants.throwVelocity.get()));
-                        dispenser.setGoal(to.getValue().getPose().pivotAngle());
-                      })
-                  .andThen(
-                      Commands.waitUntil(this::isAtGoal),
-                      runSuperstructurePose(to.getValue().getPose()),
-                      runSuperstructureExtras(to),
-                      Commands.waitUntil(this::isAtGoal)))
-          .build();
-    } else if (from == SuperstructureState.UNREVERSED
+    if (from == SuperstructureState.UNREVERSED
         && to.getValue().isReversed()) { // Handle reversed states
       return EdgeCommand.builder()
           .command(

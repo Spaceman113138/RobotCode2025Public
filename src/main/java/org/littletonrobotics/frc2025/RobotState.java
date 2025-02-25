@@ -353,7 +353,7 @@ public class RobotState {
   public Set<Translation2d> getAlgaeTranslations() {
     return algaePoses.stream()
         .filter((x) -> Timer.getTimestamp() - x.timestamp() < algaePersistanceTime)
-        .map((x) -> x.translation())
+        .map(AlgaePoseRecord::translation)
         .collect(Collectors.toSet());
   }
 

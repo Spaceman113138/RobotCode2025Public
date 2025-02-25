@@ -41,6 +41,9 @@ public class FieldConstants {
   }
 
   public static class Barge {
+    public static final double netWidth = Units.inchesToMeters(40.0);
+    public static final double netHeight = Units.inchesToMeters(88.0);
+
     public static final Translation2d farCage =
         new Translation2d(Units.inchesToMeters(345.428), Units.inchesToMeters(286.779));
     public static final Translation2d middleCage =

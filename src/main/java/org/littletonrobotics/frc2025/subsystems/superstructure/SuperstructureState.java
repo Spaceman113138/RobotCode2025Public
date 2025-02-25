@@ -64,22 +64,31 @@ public enum SuperstructureState {
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .height(Height.FIRST_STAGE)
           .build()),
+  PRE_THROWN(
+      SuperstructureStateData.builder()
+          .pose(Preset.PRE_THROW.getPose())
+          .gripperCurrent(Dispenser.gripperIntakeCurrent)
+          .height(Height.SECOND_STAGE)
+          .build()),
   THROWN(
       SuperstructureStateData.builder()
           .pose(Preset.THROW.getPose())
           .gripperCurrent(Dispenser.gripperDispenseCurrent)
-          .height(Height.SECOND_STAGE)
           .build()),
   ALGAE_STOW(
       SuperstructureStateData.builder()
           .pose(Preset.ALGAE_STOW.getPose())
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .build()),
-  TOSS(
+  PRE_TOSS(
       SuperstructureStateData.builder()
           .pose(
               new SuperstructurePose(
                   Preset.ALGAE_STOW.getPose().elevatorHeight(), () -> Rotation2d.fromDegrees(30.0)))
+          .gripperCurrent(Dispenser.gripperIntakeCurrent)
+          .build()),
+  TOSS(
+      SuperstructureState.PRE_TOSS.getValue().toBuilder()
           .gripperCurrent(Dispenser.gripperDispenseCurrent)
           .build()),
   PRE_PROCESSOR(
@@ -95,7 +104,7 @@ public enum SuperstructureState {
           .pose(Preset.POST_PRE_PROCESSOR.getPose())
           .gripperCurrent(Dispenser.gripperIntakeCurrent)
           .build()),
-  PROCESSING(
+  PROCESSED(
       POST_PRE_PROCESSOR.getValue().toBuilder()
           .gripperCurrent(Dispenser.gripperDispenseCurrent)
           .intakeVolts(Chariot.occupiedVolts)
