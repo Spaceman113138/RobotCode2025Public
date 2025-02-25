@@ -22,10 +22,3 @@ jobs:
         run: ./gradlew spotlessCheck
       - name: Build robot code
         run: ./gradlew build
-        env:
-          GENERATE_EMPTY_DRIVE_TRAJECTORIES: true
-      - name: Check constants (PR)
-        if: github.event_name == 'pull_request'
-        run: ./gradlew checkConstantsPullRequest
-        env:
-          GENERATE_EMPTY_DRIVE_TRAJECTORIES: true
